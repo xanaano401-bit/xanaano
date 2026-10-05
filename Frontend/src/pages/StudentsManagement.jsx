@@ -10,6 +10,7 @@ import IdCard from '../components/IdCard.jsx';
 import { classLabel, classSearchText } from '../utils/classLabel';
 import { isValidSomaliMobile } from '../utils/somaliPhone';
 import { useLanguage, translate, translateValue } from '../i18n/LanguageContext.jsx';
+import { currentCycle, cycleKeyForDate, cycleShortLabel, cycleLabel, addCycles } from '../utils/billingCycle';
 
 // The workbook columns mirror the registration form exactly. Student ID is
 // exported for reference but never imported — the server issues it (1001, 1002…)
@@ -271,9 +272,18 @@ const StudentsManagement = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClass, setSelectedClass] = useState('ALL');
+  const [cycleFilter, setCycleFilter] = useState('ALL'); // 'ALL' | 'CURRENT' | specific cycleKey
   const [viewMode, setViewMode] = useState(() => {
     return localStorage.getItem('studentsViewMode') || 'table';
   });
+
+  const thisCycleKey = currentCycle();
+  const newThisCycleCount = React.useMemo(() => {
+    return data.filter(s => {
+      const reg = s.registrationDate || s.createdAt;
+      return reg && cycleKeyForDate(reg) === thisCycleKey;
+    }).length;
+  }, [data, thisCycleKey]);
 
   const [foundGuardian, setFoundGuardian] = useState(null);
   const [isSearchingGuardian, setIsSearchingGuardian] = useState(false);
@@ -807,6 +817,13 @@ const StudentsManagement = () => {
       }
     }
 
+    if (cycleFilter !== 'ALL') {
+      const targetCycle = cycleFilter === 'CURRENT' ? thisCycleKey : cycleFilter;
+      const reg = item.registrationDate || item.createdAt;
+      if (!reg) return false;
+      if (cycleKeyForDate(reg) !== targetCycle) return false;
+    }
+
     if (!searchTerm.trim()) return true;
 
     const term = searchTerm.toLowerCase();
@@ -985,6 +1002,52 @@ const StudentsManagement = () => {
           )}
         </div>
 
+        {/* Cycle Filter Dropdown */}
+        <div className="flex items-center bg-white dark:bg-slate-900 rounded-2xl px-4 py-3 border border-slate-100 dark:border-slate-800 shadow-sm min-w-[240px] focus-within:ring-2 focus-within:ring-amber-500/20 transition-all">
+          <Calendar size={16} className="text-amber-500 mr-2.5 shrink-0" />
+          <select
+            value={cycleFilter}
+            onChange={(e) => setCycleFilter(e.target.value)}
+            className="w-full bg-transparent outline-none text-sm font-bold text-slate-800 dark:text-slate-200 cursor-pointer border-none p-0 focus:ring-0"
+          >
+            <option value="ALL">Dhammaan Ardayda (All Cycles)</option>
+            <option value="CURRENT">
+              ✨ Ardayda Cusub ({cycleShortLabel(thisCycleKey)}) ({newThisCycleCount})
+            </option>
+            <option value={addCycles(thisCycleKey, -1)}>
+              📅 Cycle-kii Hore ({cycleShortLabel(addCycles(thisCycleKey, -1))})
+            </option>
+          </select>
+          {cycleFilter !== 'ALL' && (
+            <button 
+              onClick={() => setCycleFilter('ALL')}
+              title={t('students.resetFilter')}
+              className="ml-2 text-slate-400 hover:text-rose-500 transition-colors p-1"
+            >
+              <X size={14} />
+            </button>
+          )}
+        </div>
+
+        {/* Quick Toggle Chip for "New This Cycle" */}
+        <button
+          onClick={() => setCycleFilter(prev => prev === 'CURRENT' ? 'ALL' : 'CURRENT')}
+          className={`flex items-center gap-2 px-4 py-3 rounded-2xl text-xs font-black transition-all shrink-0 ${
+            cycleFilter === 'CURRENT'
+              ? 'bg-amber-500 text-white shadow-md shadow-amber-500/30 ring-2 ring-amber-400'
+              : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-100 dark:border-slate-800 hover:border-amber-400 shadow-sm'
+          }`}
+          title="Kala saar ardayda cycle-kan la diiwaangeliyay oo keliya"
+        >
+          <Sparkles size={14} className={cycleFilter === 'CURRENT' ? 'animate-pulse text-white' : 'text-amber-500'} />
+          <span>Ardayda Cusub (Cycle-kan)</span>
+          <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+            cycleFilter === 'CURRENT' ? 'bg-white/20 text-white' : 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50'
+          }`}>
+            {newThisCycleCount}
+          </span>
+        </button>
+
         {/* Right side: Count Badge & View Mode Switcher */}
         <div className="flex items-center justify-between sm:justify-end gap-3 sm:ml-auto">
           <div className="flex items-center gap-2 text-xs font-bold text-slate-400 px-4 py-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
@@ -1022,6 +1085,34 @@ const StudentsManagement = () => {
           </div>
         </div>
       </div>
+
+      {/* Active Cycle Filter Banner */}
+      {cycleFilter !== 'ALL' && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/30 rounded-2xl p-4 text-amber-900 dark:text-amber-200">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm">
+              <Sparkles size={16} />
+            </div>
+            <div>
+              <p className="text-xs font-black uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                {cycleFilter === 'CURRENT' 
+                  ? `Ardayda Cusub ee Cycle-kan (${cycleLabel(thisCycleKey)})`
+                  : `Ardayda la diiwaangeliyay Cycle-ka (${cycleLabel(cycleFilter)})`}
+              </p>
+              <p className="text-xs font-medium text-slate-600 dark:text-slate-400 mt-0.5">
+                Waxaad arkeysaa <strong>{filteredStudentsCount}</strong> arday oo cycle-kan la diiwaangeliyay oo keliya. Ardaydii hore waa laga soocay.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setCycleFilter('ALL')}
+            className="flex items-center gap-1.5 self-start sm:self-auto text-xs font-black text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-white px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 transition-colors shrink-0"
+          >
+            <X size={14} />
+            <span>Muuji Dhammaan Ardayda</span>
+          </button>
+        </div>
+      )}
 
       {/* Main Student Directory Content: Table (default) or Cards View */}
       {viewMode === 'grid' ? (
