@@ -137,19 +137,21 @@ const QuranLessonManagement = () => {
 
   // Filter students based on branch
   const branchStudents = useMemo(() => {
-    if (!selectedBranchId || selectedBranchId === 'ALL') return students;
+    if (!selectedBranchId || selectedBranchId === 'ALL' || selectedBranchId === 'All') return students;
     return students.filter(s => {
-      const bId = s.branchId?._id || s.branchId;
-      return String(bId) === String(selectedBranchId);
+      const sBranchId = String(s.branchId?._id || s.branchId || '');
+      const cBranchId = String(s.classId?.branchId?._id || s.classId?.branchId || '');
+      const target = String(selectedBranchId);
+      return sBranchId === target || cBranchId === target;
     });
   }, [students, selectedBranchId]);
 
   // Filter classes based on branch
   const branchClasses = useMemo(() => {
-    if (!selectedBranchId || selectedBranchId === 'ALL') return classes;
+    if (!selectedBranchId || selectedBranchId === 'ALL' || selectedBranchId === 'All') return classes;
     return classes.filter(c => {
-      const bId = c.branchId?._id || c.branchId;
-      return String(bId) === String(selectedBranchId);
+      const bId = String(c.branchId?._id || c.branchId || '');
+      return bId === String(selectedBranchId);
     });
   }, [classes, selectedBranchId]);
 
@@ -314,8 +316,11 @@ const QuranLessonManagement = () => {
   // Filtered records for table
   const displayedRecords = useMemo(() => {
     return records.filter(r => {
-      const matchBranch = !selectedBranchId || selectedBranchId === 'ALL' ||
-        String(r.branchId?._id || r.branchId) === String(selectedBranchId);
+      const targetBranch = String(selectedBranchId || '');
+      const matchBranch = !selectedBranchId || selectedBranchId === 'ALL' || selectedBranchId === 'All' ||
+        String(r.branchId?._id || r.branchId || '') === targetBranch ||
+        String(r.studentId?.branchId?._id || r.studentId?.branchId || '') === targetBranch ||
+        String(r.classId?.branchId?._id || r.classId?.branchId || '') === targetBranch;
 
       const matchSearch = !searchFilter.trim() ||
         (r.studentName && r.studentName.toLowerCase().includes(searchFilter.toLowerCase())) ||
@@ -514,6 +519,29 @@ const QuranLessonManagement = () => {
 
           {/* Quick Action Buttons */}
           <div className="flex flex-wrap items-center gap-3 w-full lg:w-auto">
+            {/* Branch Indicator & Switcher */}
+            <div className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white/10 dark:bg-slate-800/80 border border-teal-500/30 backdrop-blur-md">
+              <Building2 size={16} className="text-teal-400 shrink-0" />
+              <div className="flex flex-col">
+                <span className="text-[9px] font-black uppercase tracking-wider text-teal-300/80">Laanta:</span>
+                <select
+                  value={selectedBranchId}
+                  onChange={(e) => setSelectedBranchId(e.target.value)}
+                  className="bg-transparent text-teal-200 font-black text-xs border-none focus:outline-none cursor-pointer pr-2"
+                >
+                  {branches.map(b => {
+                    const isDugsi = b.name && b.name.toLowerCase().includes('dugsi');
+                    return (
+                      <option key={b._id} value={b._id} className="bg-slate-900 text-white">
+                        {b.name} {isDugsi ? '(Dugsiga)' : ''}
+                      </option>
+                    );
+                  })}
+                  <option value="ALL" className="bg-slate-900 text-white">Dhammaan Laamaha (All)</option>
+                </select>
+              </div>
+            </div>
+
             <button
               onClick={handlePrint}
               className="flex-1 sm:flex-none inline-flex items-center justify-center gap-2 px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white text-xs font-bold transition-all border border-white/10 backdrop-blur-md active:scale-95"
