@@ -954,9 +954,10 @@ const StudentsManagement = () => {
       )}
 
       {/* Search Bar & Class Filter Row - Positioned directly side-by-side matching the user's screenshot */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-        {/* Search Bar */}
-        <div className="flex items-center bg-white dark:bg-slate-900 rounded-2xl px-5 py-3 border border-slate-100 dark:border-slate-800 shadow-sm flex-1 max-w-md focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all">
+      {/* Search Bar & Class Filter Row - Positioned directly side-by-side matching the user's screenshot */}
+      <div className="flex flex-wrap items-center gap-2.5">
+        {/* Search Bar - Enriched & widened */}
+        <div className="flex items-center bg-white dark:bg-slate-900 rounded-2xl px-5 py-3 border border-slate-100 dark:border-slate-800 shadow-sm flex-1 min-w-[260px] sm:min-w-[320px] focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all">
           <Search size={18} className="text-slate-400 mr-3 shrink-0" />
           <input
             type="text"
@@ -972,21 +973,21 @@ const StudentsManagement = () => {
           )}
         </div>
 
-        {/* Class Filter Dropdown directly beside the search bar */}
-        <div className="flex items-center bg-white dark:bg-slate-900 rounded-2xl px-4 py-3 border border-slate-100 dark:border-slate-800 shadow-sm min-w-[240px] focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all">
-          <Filter size={16} className="text-emerald-500 mr-2.5 shrink-0" />
+        {/* Class Filter Dropdown - Compact */}
+        <div className="flex items-center bg-white dark:bg-slate-900 rounded-2xl px-3 py-3 border border-slate-100 dark:border-slate-800 shadow-sm shrink-0 focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all">
+          <Filter size={15} className="text-emerald-500 mr-2 shrink-0" />
           <select
             value={selectedClass}
             onChange={(e) => setSelectedClass(e.target.value)}
-            className="w-full bg-transparent outline-none text-sm font-bold text-slate-800 dark:text-slate-200 cursor-pointer border-none p-0 focus:ring-0"
+            className="bg-transparent outline-none text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 cursor-pointer border-none p-0 focus:ring-0 max-w-[140px] truncate"
           >
-            <option value="ALL">{t('students.allClassesCount', { count: data.length })}</option>
+            <option value="ALL">All ({data.length})</option>
             {classes.map(c => {
               const count = classCounts[String(c._id)] || 0;
               const label = classLabel(c, c.name || c.className || t('common.class'));
               return (
                 <option key={c._id} value={c._id}>
-                  {label} ({t('students.studentCount', { count })})
+                  {label} ({count})
                 </option>
               );
             })}
@@ -995,44 +996,44 @@ const StudentsManagement = () => {
             <button 
               onClick={() => setSelectedClass('ALL')}
               title={t('students.resetFilter')}
-              className="ml-2 text-slate-400 hover:text-rose-500 transition-colors p-1"
+              className="ml-1 text-slate-400 hover:text-rose-500 transition-colors p-1"
             >
-              <X size={14} />
+              <X size={13} />
             </button>
           )}
         </div>
 
-        {/* Cycle Filter Dropdown */}
-        <div className="flex items-center bg-white dark:bg-slate-900 rounded-2xl px-4 py-3 border border-slate-100 dark:border-slate-800 shadow-sm min-w-[240px] focus-within:ring-2 focus-within:ring-amber-500/20 transition-all">
-          <Calendar size={16} className="text-amber-500 mr-2.5 shrink-0" />
+        {/* Cycle Filter Dropdown - "All" visibly at the beginning */}
+        <div className="flex items-center bg-white dark:bg-slate-900 rounded-2xl px-3 py-3 border border-slate-100 dark:border-slate-800 shadow-sm shrink-0 focus-within:ring-2 focus-within:ring-amber-500/20 transition-all">
+          <Calendar size={15} className="text-amber-500 mr-2 shrink-0" />
           <select
             value={cycleFilter}
             onChange={(e) => setCycleFilter(e.target.value)}
-            className="w-full bg-transparent outline-none text-sm font-bold text-slate-800 dark:text-slate-200 cursor-pointer border-none p-0 focus:ring-0"
+            className="bg-transparent outline-none text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 cursor-pointer border-none p-0 focus:ring-0 max-w-[150px] truncate"
           >
-            <option value="ALL">Dhammaan Ardayda (All Cycles)</option>
+            <option value="ALL">All (Dhammaan)</option>
             <option value="CURRENT">
-              ✨ Ardayda Cusub ({cycleShortLabel(thisCycleKey)}) ({newThisCycleCount})
+              ✨ Cusub ({newThisCycleCount})
             </option>
             <option value={addCycles(thisCycleKey, -1)}>
-              📅 Cycle-kii Hore ({cycleShortLabel(addCycles(thisCycleKey, -1))})
+              📅 Hore ({cycleShortLabel(addCycles(thisCycleKey, -1))})
             </option>
           </select>
           {cycleFilter !== 'ALL' && (
             <button 
               onClick={() => setCycleFilter('ALL')}
               title={t('students.resetFilter')}
-              className="ml-2 text-slate-400 hover:text-rose-500 transition-colors p-1"
+              className="ml-1 text-slate-400 hover:text-rose-500 transition-colors p-1"
             >
-              <X size={14} />
+              <X size={13} />
             </button>
           )}
         </div>
 
-        {/* Quick Toggle Chip for "New This Cycle" */}
+        {/* Quick Toggle Chip for "New This Cycle" - Shortened */}
         <button
           onClick={() => setCycleFilter(prev => prev === 'CURRENT' ? 'ALL' : 'CURRENT')}
-          className={`flex items-center gap-2 px-4 py-3 rounded-2xl text-xs font-black transition-all shrink-0 ${
+          className={`flex items-center gap-1.5 px-3 py-3 rounded-2xl text-xs font-black transition-all shrink-0 ${
             cycleFilter === 'CURRENT'
               ? 'bg-amber-500 text-white shadow-md shadow-amber-500/30 ring-2 ring-amber-400'
               : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-100 dark:border-slate-800 hover:border-amber-400 shadow-sm'
@@ -1040,8 +1041,8 @@ const StudentsManagement = () => {
           title="Kala saar ardayda cycle-kan la diiwaangeliyay oo keliya"
         >
           <Sparkles size={14} className={cycleFilter === 'CURRENT' ? 'animate-pulse text-white' : 'text-amber-500'} />
-          <span>Ardayda Cusub (Cycle-kan)</span>
-          <span className={`px-2 py-0.5 rounded-full text-[10px] font-extrabold ${
+          <span>Ardayda Cusub</span>
+          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-extrabold ${
             cycleFilter === 'CURRENT' ? 'bg-white/20 text-white' : 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400 border border-amber-200/50 dark:border-amber-800/50'
           }`}>
             {newThisCycleCount}
@@ -1049,38 +1050,35 @@ const StudentsManagement = () => {
         </button>
 
         {/* Right side: Count Badge & View Mode Switcher */}
-        <div className="flex items-center justify-between sm:justify-end gap-3 sm:ml-auto">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-400 px-4 py-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
-            <span>{t('students.showing')}</span>
-            <span className="text-emerald-600 dark:text-emerald-400 font-extrabold">{filteredStudentsCount}</span>
-            <span>{t('students.of')}</span>
-            <span>{t('students.totalStudents', { count: totalStudentsCount })}</span>
+        <div className="flex items-center gap-2 ml-auto shrink-0">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-slate-400 px-3 py-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+            <span>{filteredStudentsCount} / {totalStudentsCount}</span>
           </div>
 
           <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
             <button
               onClick={() => { setViewMode('table'); localStorage.setItem('studentsViewMode', 'table'); }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
                 viewMode === 'table'
                   ? 'bg-emerald-600 text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
               }`}
               title={t('students.tableView')}
             >
-              <List size={15} />
-              <span className="hidden md:inline">{t('students.table')}</span>
+              <List size={14} />
+              <span className="hidden sm:inline">{t('students.table')}</span>
             </button>
             <button
               onClick={() => { setViewMode('grid'); localStorage.setItem('studentsViewMode', 'grid'); }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-xl text-xs font-bold transition-all ${
                 viewMode === 'grid'
                   ? 'bg-emerald-600 text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
               }`}
               title={t('students.cardsView')}
             >
-              <LayoutGrid size={15} />
-              <span className="hidden md:inline">{t('students.cards')}</span>
+              <LayoutGrid size={14} />
+              <span className="hidden sm:inline">{t('students.cards')}</span>
             </button>
           </div>
         </div>
