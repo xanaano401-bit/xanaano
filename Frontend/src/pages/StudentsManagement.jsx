@@ -521,11 +521,10 @@ const StudentsManagement = () => {
     return id;
   };
 
-  // A student is treated as already present when the same name sits in the same
-  // class under the same father's phone. There is no unique key on students in
-  // the schema, so this is the closest match to a real-world duplicate.
-  const studentKey = (name, classId, fatherPhone) =>
-    `${String(name).trim().toLowerCase()}|${String(classId)}|${digitsOnly(fatherPhone)}`;
+  // A student is treated as already present when the same name sits in the same class.
+  // This prevents duplicates even if the phone has a typo, extra digit, or was left blank.
+  const studentKey = (name, classId) =>
+    `${String(name).trim().toLowerCase()}|${String(classId)}`;
 
   const importRow = async (row, existingKeys, cache) => {
     if (!row.fullName) throw new Error(t('students.import.fullNameRequired'));
@@ -541,9 +540,8 @@ const StudentsManagement = () => {
     const fatherName = row.fatherName || row.payerName || '';
     const fatherPhone = row.fatherPhone || row.payerPhone || '';
 
-    // Key on the value that actually gets stored, so an exported file re-imports
-    // as "already registered" even when the sheet's Father Phone cell was blank.
-    const key = studentKey(row.fullName, cls._id, fatherPhone);
+    // Check duplicate by normalized name and class
+    const key = studentKey(row.fullName, cls._id);
     if (existingKeys.has(key)) throw new Error(t('students.import.alreadyRegistered'));
 
     const guardianId = await resolveGuardian(row, cache);
@@ -611,7 +609,7 @@ const StudentsManagement = () => {
       }
 
       const existingKeys = new Set(
-        data.map(s => studentKey(s.fullName, s.classId?._id || s.classId, s.fatherPhone))
+        data.map(s => studentKey(s.fullName, s.classId?._id || s.classId))
       );
       const cache = new Map();
       const results = [];
