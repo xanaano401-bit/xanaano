@@ -119,6 +119,7 @@ const studentSchema = new mongoose.Schema({
             default: 5
         },
         lastStatus: {
+            type: String,
             enum: ['passed', 'repeat', 'in_progress'],
             default: 'passed'
         },

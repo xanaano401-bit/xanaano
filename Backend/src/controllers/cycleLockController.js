@@ -7,8 +7,11 @@ const { cycleRange, cycleKeyForDate } = require('../utils/billingCycle');
 const canManageCycleLocks = (user) => {
     if (!user) return false;
     const roleName = user.role || '';
-    if (['Super Admin', 'Institute Admin', 'Admin', 'Branch Manager'].includes(roleName)) return true;
-    if (user.customPermissions?.Finance?.LockCycles) return true;
+    const allowed = ['Super Admin', 'Institute Admin', 'Admin', 'Branch Manager', 'Accountant', 'Owner'];
+    if (allowed.includes(roleName)) return true;
+    const roleNames = Array.isArray(user.roles) ? user.roles.map(r => (typeof r === 'string' ? r : r.name)) : [];
+    if (roleNames.some(rn => allowed.includes(rn))) return true;
+    if (user.customPermissions?.Finance?.LockCycles || user.customPermissions?.Finance?.Cashbook) return true;
     return false;
 };
 
