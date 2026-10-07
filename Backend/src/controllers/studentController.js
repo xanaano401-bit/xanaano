@@ -35,6 +35,31 @@ const getStudentById = asyncHandler(async (req, res) => {
 const createStudent = asyncHandler(async (req, res) => {
     const payload = { ...req.body };
 
+    const trimmedName = (payload.fullName || '').trim();
+    if (!trimmedName) {
+        res.status(400);
+        throw new Error('Fadlan geli magaca buuxa ee ardayga');
+    }
+
+    // Duplicate check: Prevent registering the same student multiple times in the same class/branch
+    const escapedName = trimmedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const duplicateQuery = {
+        fullName: { $regex: new RegExp(`^${escapedName}$`, 'i') },
+        status: { $ne: 'Exited' }
+    };
+    if (payload.classId) {
+        duplicateQuery.classId = payload.classId;
+    } else if (payload.branchId) {
+        duplicateQuery.branchId = payload.branchId;
+    }
+
+    const existingStudent = await Student.findOne(duplicateQuery).populate('classId', 'name className');
+    if (existingStudent) {
+        const clsName = existingStudent.classId?.name || existingStudent.classId?.className || 'fasalkan';
+        res.status(400);
+        throw new Error(`Ardaygan "${trimmedName}" horey ayuu ugu jiraa ${clsName} (#${existingStudent.studentCode || ''})! Laguma celin karo laba jeer.`);
+    }
+
     // The student ID is issued by the system, never accepted from the client and
     // never derived from the user-typed roll number, so it cannot be set by hand
     // or duplicated. Existing students keep whatever code they were given.
@@ -74,6 +99,32 @@ const createStudent = asyncHandler(async (req, res) => {
 const updateStudent = asyncHandler(async (req, res) => {
     const payload = { ...req.body };
 
+    const existing = await Student.findById(req.params.id);
+    if (!existing) {
+        res.status(404);
+        throw new Error('Student not found');
+    }
+
+    // Check duplicate if name or class changed
+    if (payload.fullName || payload.classId) {
+        const targetName = (payload.fullName || existing.fullName || '').trim();
+        const targetClass = payload.classId || existing.classId;
+        const escapedName = targetName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
+        const duplicateCheck = await Student.findOne({
+            _id: { $ne: existing._id },
+            fullName: { $regex: new RegExp(`^${escapedName}$`, 'i') },
+            classId: targetClass,
+            status: { $ne: 'Exited' }
+        }).populate('classId', 'name className');
+
+        if (duplicateCheck) {
+            const clsName = duplicateCheck.classId?.name || duplicateCheck.classId?.className || 'fasalkan';
+            res.status(400);
+            throw new Error(`Arday magacan "${targetName}" leh horey ayuu ugu jiraa ${clsName}!`);
+        }
+    }
+
     // The issued student ID stays with the student for life, so an edit can never
     // move or clear it.
     delete payload.studentCode;
@@ -83,12 +134,6 @@ const updateStudent = asyncHandler(async (req, res) => {
     }
     if (payload.monthlyFee !== undefined && payload.fee === undefined) {
         payload.fee = Number(payload.monthlyFee) || 0;
-    }
-
-    const existing = await Student.findById(req.params.id);
-    if (!existing) {
-        res.status(404);
-        throw new Error('Student not found');
     }
 
     if (payload.monthlyFee !== undefined) {

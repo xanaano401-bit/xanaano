@@ -154,16 +154,18 @@ const QuranManagement = () => {
   }, [branchStudents, studentSearchQuery]);
 
 
-  // Filter 114 Surahs based on query
+  // Filter 114 Surahs based on query (shows all 114 surahs in order)
   const filteredSurahs = useMemo(() => {
-    if (!surahSearchQuery.trim()) return QURAN_SURAHS.slice(0, 20);
+    if (!surahSearchQuery.trim() || (selectedSurah && surahSearchQuery === `${selectedSurah.number}. ${selectedSurah.nameAr} (${selectedSurah.nameSo})`)) {
+      return QURAN_SURAHS;
+    }
     const q = surahSearchQuery.toLowerCase().trim();
     return QURAN_SURAHS.filter(s =>
       s.nameAr.includes(q) ||
-      s.nameSo.toLowerCase().includes(q) ||
-      s.number.toString() === q
+      (s.nameSo && s.nameSo.toLowerCase().includes(q)) ||
+      String(s.number).includes(q)
     );
-  }, [surahSearchQuery]);
+  }, [surahSearchQuery, selectedSurah]);
 
   // Handle selecting a student:
   // AUTO-FILLS: Student Name and Halaqah Name.
@@ -805,6 +807,10 @@ const QuranManagement = () => {
               {/* Surah Dropdown List */}
               {isSurahDropdownOpen && filteredSurahs.length > 0 && (
                 <div className="absolute z-30 left-0 right-0 mt-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl shadow-xl max-h-64 overflow-y-auto divide-y divide-slate-100 dark:divide-slate-700">
+                  <div className="px-3 py-2 bg-slate-50 dark:bg-slate-700/60 sticky top-0 z-10 flex items-center justify-between text-[11px] font-bold text-slate-500 dark:text-slate-300 border-b border-slate-100 dark:border-slate-700">
+                    <span>114 Suuradood ({filteredSurahs.length} diyaar ah)</span>
+                    <span className="text-[10px] text-emerald-600 dark:text-emerald-400">Dooro mid</span>
+                  </div>
                   {filteredSurahs.map((surah) => (
                     <div
                       key={surah.number}

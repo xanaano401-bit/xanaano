@@ -11,6 +11,7 @@ import IdCard from '../components/IdCard.jsx';
 import { classLabel, classSearchText } from '../utils/classLabel';
 import { isValidSomaliMobile } from '../utils/somaliPhone';
 import { useLanguage, translate, translateValue } from '../i18n/LanguageContext.jsx';
+import { currentCycle, cycleKeyForDate, cycleShortLabel, cycleLabel, addCycles } from '../utils/billingCycle';
 
 // The workbook columns mirror the registration form exactly. Student ID is
 // exported for reference but never imported — the server issues it (1001, 1002…)
@@ -272,9 +273,18 @@ const StudentsManagement = () => {
   const [editingItem, setEditingItem] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedClass, setSelectedClass] = useState('ALL');
+  const [cycleFilter, setCycleFilter] = useState('ALL'); // 'ALL' | 'CURRENT' | specific cycleKey
   const [viewMode, setViewMode] = useState(() => {
     return localStorage.getItem('studentsViewMode') || 'table';
   });
+
+  const thisCycleKey = currentCycle();
+  const newThisCycleCount = React.useMemo(() => {
+    return data.filter(s => {
+      const reg = s.registrationDate || s.createdAt;
+      return reg && cycleKeyForDate(reg) === thisCycleKey;
+    }).length;
+  }, [data, thisCycleKey]);
 
   const [foundGuardian, setFoundGuardian] = useState(null);
   const [isSearchingGuardian, setIsSearchingGuardian] = useState(false);
@@ -518,11 +528,10 @@ const StudentsManagement = () => {
     return id;
   };
 
-  // A student is treated as already present when the same name sits in the same
-  // class under the same father's phone. There is no unique key on students in
-  // the schema, so this is the closest match to a real-world duplicate.
-  const studentKey = (name, classId, fatherPhone) =>
-    `${String(name).trim().toLowerCase()}|${String(classId)}|${digitsOnly(fatherPhone)}`;
+  // A student is treated as already present when the same name sits in the same class.
+  // This prevents duplicates even if the phone has a typo, extra digit, or was left blank.
+  const studentKey = (name, classId) =>
+    `${String(name).trim().toLowerCase()}|${String(classId)}`;
 
   const importRow = async (row, existingKeys, cache) => {
     if (!row.fullName) throw new Error(t('students.import.fullNameRequired'));
@@ -538,9 +547,8 @@ const StudentsManagement = () => {
     const fatherName = row.fatherName || row.payerName || '';
     const fatherPhone = row.fatherPhone || row.payerPhone || '';
 
-    // Key on the value that actually gets stored, so an exported file re-imports
-    // as "already registered" even when the sheet's Father Phone cell was blank.
-    const key = studentKey(row.fullName, cls._id, fatherPhone);
+    // Check duplicate by normalized name and class
+    const key = studentKey(row.fullName, cls._id);
     if (existingKeys.has(key)) throw new Error(t('students.import.alreadyRegistered'));
 
     const guardianId = await resolveGuardian(row, cache);
@@ -608,7 +616,7 @@ const StudentsManagement = () => {
       }
 
       const existingKeys = new Set(
-        data.map(s => studentKey(s.fullName, s.classId?._id || s.classId, s.fatherPhone))
+        data.map(s => studentKey(s.fullName, s.classId?._id || s.classId))
       );
       const cache = new Map();
       const results = [];
@@ -873,6 +881,13 @@ const StudentsManagement = () => {
       }
     }
 
+    if (cycleFilter !== 'ALL') {
+      const targetCycle = cycleFilter === 'CURRENT' ? thisCycleKey : cycleFilter;
+      const reg = item.registrationDate || item.createdAt;
+      if (!reg) return false;
+      if (cycleKeyForDate(reg) !== targetCycle) return false;
+    }
+
     if (!searchTerm.trim()) return true;
 
     const term = searchTerm.toLowerCase();
@@ -1002,11 +1017,11 @@ const StudentsManagement = () => {
         </div>
       )}
 
-      {/* Search Bar & Class Filter Row - Positioned directly side-by-side matching the user's screenshot */}
-      <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-        {/* Search Bar */}
-        <div className="flex items-center bg-white dark:bg-slate-900 rounded-2xl px-5 py-3 border border-slate-100 dark:border-slate-800 shadow-sm flex-1 max-w-md focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all">
-          <Search size={18} className="text-slate-400 mr-3 shrink-0" />
+      {/* Search Bar & Class Filter Row - Single horizontal line, elongated search, compact filters */}
+      <div className="flex flex-row items-center gap-2 w-full">
+        {/* Search Bar - Elongated & expanded */}
+        <div className="flex items-center bg-white dark:bg-slate-900 rounded-2xl px-4 py-2.5 border border-slate-100 dark:border-slate-800 shadow-sm flex-1 min-w-[180px] focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all">
+          <Search size={18} className="text-slate-400 mr-2.5 shrink-0" />
           <input
             type="text"
             placeholder={t('students.searchPlaceholder')}
@@ -1015,27 +1030,27 @@ const StudentsManagement = () => {
             className="w-full bg-transparent outline-none text-sm text-slate-900 dark:text-white placeholder:text-slate-400 border-none p-0 focus:ring-0 font-medium"
           />
           {searchTerm && (
-            <button onClick={() => setSearchTerm('')} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-1">
+            <button onClick={() => setSearchTerm('')} className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 p-0.5">
               <X size={14} />
             </button>
           )}
         </div>
 
-        {/* Class Filter Dropdown directly beside the search bar */}
-        <div className="flex items-center bg-white dark:bg-slate-900 rounded-2xl px-4 py-3 border border-slate-100 dark:border-slate-800 shadow-sm min-w-[240px] focus-within:ring-2 focus-within:ring-emerald-500/20 transition-all">
-          <Filter size={16} className="text-emerald-500 mr-2.5 shrink-0" />
+        {/* Class Filter - Compact */}
+        <div className="flex items-center bg-white dark:bg-slate-900 rounded-2xl px-3 py-2.5 border border-slate-100 dark:border-slate-800 shadow-sm shrink-0">
+          <Filter size={15} className="text-emerald-500 mr-1.5 shrink-0" />
           <select
             value={selectedClass}
             onChange={(e) => setSelectedClass(e.target.value)}
-            className="w-full bg-transparent outline-none text-sm font-bold text-slate-800 dark:text-slate-200 cursor-pointer border-none p-0 focus:ring-0"
+            className="bg-transparent outline-none text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 cursor-pointer border-none p-0 focus:ring-0"
           >
-            <option value="ALL">{t('students.allClassesCount', { count: data.length })}</option>
+            <option value="ALL">All Classes ({data.length})</option>
             {classes.map(c => {
               const count = classCounts[String(c._id)] || 0;
               const label = classLabel(c, c.name || c.className || t('common.class'));
               return (
                 <option key={c._id} value={c._id}>
-                  {label} ({t('students.studentCount', { count })})
+                  {label} ({count})
                 </option>
               );
             })}
@@ -1044,50 +1059,115 @@ const StudentsManagement = () => {
             <button 
               onClick={() => setSelectedClass('ALL')}
               title={t('students.resetFilter')}
-              className="ml-2 text-slate-400 hover:text-rose-500 transition-colors p-1"
+              className="ml-1 text-slate-400 hover:text-rose-500 transition-colors"
             >
-              <X size={14} />
+              <X size={12} />
             </button>
           )}
         </div>
 
+        {/* Cycle Filter Dropdown - "All" visibly shown */}
+        <div className="flex items-center bg-white dark:bg-slate-900 rounded-2xl px-3 py-2.5 border border-slate-100 dark:border-slate-800 shadow-sm shrink-0">
+          <Calendar size={15} className="text-amber-500 mr-1.5 shrink-0" />
+          <select
+            value={cycleFilter}
+            onChange={(e) => setCycleFilter(e.target.value)}
+            className="bg-transparent outline-none text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 cursor-pointer border-none p-0 focus:ring-0"
+          >
+            <option value="ALL">All ({data.length})</option>
+            <option value="CURRENT">✨ Cusub ({newThisCycleCount})</option>
+            <option value={addCycles(thisCycleKey, -1)}>📅 Hore</option>
+          </select>
+          {cycleFilter !== 'ALL' && (
+            <button 
+              onClick={() => setCycleFilter('ALL')}
+              title={t('students.resetFilter')}
+              className="ml-1 text-slate-400 hover:text-rose-500 transition-colors"
+            >
+              <X size={12} />
+            </button>
+          )}
+        </div>
+
+        {/* Quick Toggle Chip for "New This Cycle" - Shortened */}
+        <button
+          onClick={() => setCycleFilter(prev => prev === 'CURRENT' ? 'ALL' : 'CURRENT')}
+          className={`flex items-center gap-1.5 px-3 py-2.5 rounded-2xl text-xs font-black transition-all shrink-0 ${
+            cycleFilter === 'CURRENT'
+              ? 'bg-amber-500 text-white shadow-sm ring-2 ring-amber-400'
+              : 'bg-white dark:bg-slate-900 text-slate-700 dark:text-slate-300 border border-slate-100 dark:border-slate-800 hover:border-amber-400 shadow-sm'
+          }`}
+          title="Kala saar ardayda cycle-kan la diiwaangeliyay oo keliya"
+        >
+          <Sparkles size={13} className={cycleFilter === 'CURRENT' ? 'animate-pulse text-white' : 'text-amber-500'} />
+          <span>Cusub</span>
+          <span className={`px-1.5 py-0.5 rounded-full text-[10px] font-extrabold ${
+            cycleFilter === 'CURRENT' ? 'bg-white/20 text-white' : 'bg-amber-50 dark:bg-amber-950/50 text-amber-600 dark:text-amber-400'
+          }`}>
+            {newThisCycleCount}
+          </span>
+        </button>
+
         {/* Right side: Count Badge & View Mode Switcher */}
-        <div className="flex items-center justify-between sm:justify-end gap-3 sm:ml-auto">
-          <div className="flex items-center gap-2 text-xs font-bold text-slate-400 px-4 py-3 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
-            <span>{t('students.showing')}</span>
-            <span className="text-emerald-600 dark:text-emerald-400 font-extrabold">{filteredStudentsCount}</span>
-            <span>{t('students.of')}</span>
-            <span>{t('students.totalStudents', { count: totalStudentsCount })}</span>
+        <div className="flex items-center gap-1.5 ml-auto shrink-0">
+          <div className="flex items-center text-xs font-bold text-slate-400 px-2.5 py-2.5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm whitespace-nowrap">
+            <span>{filteredStudentsCount}/{totalStudentsCount}</span>
           </div>
 
-          <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1.5 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
+          <div className="flex items-center gap-0.5 bg-white dark:bg-slate-900 p-1 rounded-2xl border border-slate-100 dark:border-slate-800 shadow-sm">
             <button
               onClick={() => { setViewMode('table'); localStorage.setItem('studentsViewMode', 'table'); }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              className={`p-1.5 rounded-xl text-xs font-bold transition-all ${
                 viewMode === 'table'
                   ? 'bg-emerald-600 text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
               }`}
               title={t('students.tableView')}
             >
-              <List size={15} />
-              <span className="hidden md:inline">{t('students.table')}</span>
+              <List size={14} />
             </button>
             <button
               onClick={() => { setViewMode('grid'); localStorage.setItem('studentsViewMode', 'grid'); }}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition-all ${
+              className={`p-1.5 rounded-xl text-xs font-bold transition-all ${
                 viewMode === 'grid'
                   ? 'bg-emerald-600 text-white shadow-sm'
                   : 'text-slate-400 hover:text-slate-700 dark:hover:text-slate-200'
               }`}
               title={t('students.cardsView')}
             >
-              <LayoutGrid size={15} />
-              <span className="hidden md:inline">{t('students.cards')}</span>
+              <LayoutGrid size={14} />
             </button>
           </div>
         </div>
       </div>
+
+      {/* Active Cycle Filter Banner */}
+      {cycleFilter !== 'ALL' && (
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 bg-gradient-to-r from-amber-500/10 via-amber-500/5 to-transparent border border-amber-500/30 rounded-2xl p-4 text-amber-900 dark:text-amber-200">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-xl bg-amber-500 text-white flex items-center justify-center shrink-0 shadow-sm">
+              <Sparkles size={16} />
+            </div>
+            <div>
+              <p className="text-xs font-black uppercase tracking-wider text-amber-700 dark:text-amber-300">
+                {cycleFilter === 'CURRENT' 
+                  ? `Ardayda Cusub ee Cycle-kan (${cycleLabel(thisCycleKey)})`
+                  : `Ardayda la diiwaangeliyay Cycle-ka (${cycleLabel(cycleFilter)})`}
+              </p>
+              <p className="text-xs font-medium text-slate-600 dark:text-slate-400 mt-0.5">
+                Waxaad arkeysaa <strong>{filteredStudentsCount}</strong> arday oo cycle-kan la diiwaangeliyay oo keliya. Ardaydii hore waa laga soocay.
+              </p>
+            </div>
+          </div>
+          <button
+            onClick={() => setCycleFilter('ALL')}
+            className="flex items-center gap-1.5 self-start sm:self-auto text-xs font-black text-amber-700 dark:text-amber-300 hover:text-amber-900 dark:hover:text-white px-3 py-1.5 rounded-xl bg-amber-500/10 hover:bg-amber-500/20 transition-colors shrink-0"
+          >
+            <X size={14} />
+            <span>Muuji Dhammaan Ardayda</span>
+          </button>
+        </div>
+      )}
 
       {/* Main Student Directory Content: Table (default) or Cards View */}
       {viewMode === 'grid' ? (

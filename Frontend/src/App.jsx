@@ -38,6 +38,7 @@ import ActivityLogs from './pages/ActivityLogs.jsx';
 import BusinessProfile from './pages/BusinessProfile.jsx';
 import SystemPreferences from './pages/settings/SystemPreferences.jsx';
 import QuranManagement from './pages/QuranManagement.jsx';
+import QuranLessonManagement from './pages/QuranLessonManagement.jsx';
 
 import { UserRole } from './types.js';
 import { NAV_CONFIG } from './constants.jsx';
@@ -272,6 +273,7 @@ const App = () => {
                     <Route path="/" element={<DashboardOverview />} />
                     <Route path="/quran" element={<Navigate to="/quran/surahs" replace />} />
                     <Route path="/quran/surahs" element={<QuranManagement />} />
+                    <Route path="/quran/lessons" element={<QuranLessonManagement />} />
 
                     {/* Academic Management */}
                     <Route path="/academic/classes" element={<ClassesManagement />} />

@@ -4,9 +4,16 @@ const {
     getQuranLessonRecords,
     createQuranLessonRecord,
     updateQuranLessonRecord,
-    deleteQuranLessonRecord
+    deleteQuranLessonRecord,
+    getClassQuranSheet,
+    batchRecordQuranLessons,
+    updateStudentQuranProgress
 } = require('../controllers/quranLessonController');
 const { protect } = require('../middleware/authMiddleware');
+
+router.get('/class-sheet', protect, getClassQuranSheet);
+router.post('/batch', protect, batchRecordQuranLessons);
+router.put('/progress/:studentId', protect, updateStudentQuranProgress);
 
 router.route('/')
     .get(protect, getQuranLessonRecords)

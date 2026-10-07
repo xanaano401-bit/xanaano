@@ -1,7 +1,7 @@
 // Navigation, layout chrome (sidebar, navbar, footer) and the language picker.
 export default {
   en: {
-    dashboard: 'Dashboard', quran: "Qur'aan", quranSurahs: 'Surah Schedule', academicManagement: 'Academic Management', classes: 'Classes', teachers: 'Teachers',
+    dashboard: 'Dashboard', quran: "Qur'aan", quranSurahs: 'Surah Schedule', quranLessons: 'Lesson Schedule', academicManagement: 'Academic Management', classes: 'Classes', teachers: 'Teachers',
     students: 'Students', guardians: 'Guardians', exitStudents: 'Exit Students', classPromotion: 'Class Promotion',
     attendance: 'Attendance', studentAttendance: 'Student Attendance', teacherAttendance: 'Teacher Attendance',
     sessionSettings: 'Session Settings', examinations: 'Examinations', exams: 'Exams', markEntry: 'Mark Entry',
@@ -29,7 +29,7 @@ export default {
     }
   },
   so: {
-    dashboard: 'Dulmarka Nidaamka', quran: "Qur'aan", quranSurahs: 'Jadwalka Suuradaha', academicManagement: 'Maamulka Waxbarashada', classes: 'Fasallada', teachers: 'Macallimiinta',
+    dashboard: 'Dulmarka Nidaamka', quran: "Qur'aan", quranSurahs: 'Jadwalka Suuradaha', quranLessons: 'Jadwalka Cashirada', academicManagement: 'Maamulka Waxbarashada', classes: 'Fasallada', teachers: 'Macallimiinta',
     students: 'Ardayda', guardians: 'Masuuliyiinta', exitStudents: 'Ardayda Baxay', classPromotion: 'Dallacsiinta Fasalka',
     attendance: 'Xaadirinta', studentAttendance: 'Xaadirinta Ardayda', teacherAttendance: 'Xaadirinta Macallimiinta',
     sessionSettings: 'Dejinta Fadhiyada', examinations: 'Imtixaannada', exams: 'Imtixaannada', markEntry: 'Gelinta Dhibcaha',
@@ -57,6 +57,6 @@ export default {
     }
   },
   ar: {
-    dashboard: 'لوحة التحكم', quran: 'القرآن الكريم', quranSurahs: 'جدول السور', academicManagement: 'الإدارة الأكاديمية', classes: 'الفصول', teachers: 'المعلمون', students: 'الطلاب', classPromotion: 'ترقية الفصل', attendance: 'الحضور', studentAttendance: 'حضور الطلاب', teacherAttendance: 'حضور المعلمين', examinations: 'الامتحانات', exams: 'الاختبارات', markEntry: 'إدخال الدرجات', results: 'النتائج', finance: 'المالية', cashbook: 'دفتر النقدية', payers: 'الدافعون', wallets: 'المحافظ', instituteStructure: 'هيكل المعهد', branches: 'الفروع', reports: 'التقارير', feePaymentReport: 'تقرير دفع الرسوم', categorySummaryReport: 'تقرير ملخص الفئات', paymentReport: 'تقرير الدفع', attendanceLedger: 'سجل الحضور', usersAccess: 'المستخدمون والصلاحيات', users: 'المستخدمون', rolesPermissions: 'الأدوار والصلاحيات', logs: 'السجلات', settings: 'الإعدادات', search: 'ابحث عن أي شيء...', notifications: 'الإشعارات', profile: 'الملف الشخصي', changePassword: 'تغيير كلمة المرور', logout: 'تسجيل الخروج', systemLanguage: 'لغة النظام', english: 'الإنجليزية', somali: 'الصومالية', arabic: 'العربية', languageSaved: 'تم حفظ اللغة وتحديث الواجهة.', languageDescription: 'اختر اللغة المستخدمة في التطبيق.', systemPreferences: 'تفضيلات النظام', saveLanguage: 'حفظ الإعدادات', instituteManagement: 'إدارة المعهد', signedInAs: 'تم تسجيل الدخول باسم', openMenu: 'فتح القائمة', toggleDarkMode: 'تبديل الوضع الداكن'
+    dashboard: 'لوحة التحكم', quran: 'القرآن الكريم', quranSurahs: 'جدول السور', quranLessons: 'جدول الدروس', academicManagement: 'الإدارة الأكاديمية', classes: 'الفصول', teachers: 'المعلمون', students: 'الطلاب', classPromotion: 'ترقية الفصل', attendance: 'الحضور', studentAttendance: 'حضور الطلاب', teacherAttendance: 'حضور المعلمين', examinations: 'الامتحانات', exams: 'الاختبارات', markEntry: 'إدخال الدرجات', results: 'النتائج', finance: 'المالية', cashbook: 'دفتر النقدية', payers: 'الدافعون', wallets: 'المحافظ', instituteStructure: 'هيكل المعهد', branches: 'الفروع', reports: 'التقارير', feePaymentReport: 'تقرير دفع الرسوم', categorySummaryReport: 'تقرير ملخص الفئات', paymentReport: 'تقرير الدفع', attendanceLedger: 'سجل الحضور', usersAccess: 'المستخدمون والصلاحيات', users: 'المستخدمون', rolesPermissions: 'الأدوار والصلاحيات', logs: 'السجلات', settings: 'الإعدادات', search: 'ابحث عن أي شيء...', notifications: 'الإشعارات', profile: 'الملف الشخصي', changePassword: 'تغيير كلمة المرور', logout: 'تسجيل الخروج', systemLanguage: 'لغة النظام', english: 'الإنجليزية', somali: 'الصومالية', arabic: 'العربية', languageSaved: 'تم حفظ اللغة وتحديث الواجهة.', languageDescription: 'اختر اللغة المستخدمة في التطبيق.', systemPreferences: 'تفضيلات النظام', saveLanguage: 'حفظ الإعدادات', instituteManagement: 'إدارة المعهد', signedInAs: 'تم تسجيل الدخول باسم', openMenu: 'فتح القائمة', toggleDarkMode: 'تبديل الوضع الداكن'
   }
 };
