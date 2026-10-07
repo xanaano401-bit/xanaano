@@ -16,10 +16,7 @@ import {
   FileText,
   FileBarChart,
   GraduationCap,
-  Settings,
-  ClipboardList,
-  PenSquare,
-  Award
+  Settings
 } from 'lucide-react';
 import { UserRole } from './types.js';
 
@@ -54,12 +51,10 @@ export const NAV_CONFIG = [
     icon: BookOpen,
     roles: [UserRole.SUPER_ADMIN, UserRole.INSTITUTE_ADMIN, UserRole.BRANCH_MANAGER],
     subItems: [
-      { label: 'Classes', translationKey: 'classes', path: '/academic/classes', icon: BookOpen },
       { label: 'Teachers', translationKey: 'teachers', path: '/academic/teachers', icon: GraduationCap },
       { label: 'Students', translationKey: 'students', path: '/academic/students', icon: Users },
       { label: 'Guardians', translationKey: 'guardians', path: '/academic/guardians', icon: Users },
       { label: 'Exit Students', translationKey: 'exitStudents', path: '/academic/exit-students', icon: UserCheck },
-      { label: 'Class Promotion', translationKey: 'classPromotion', path: '/academic/promotion', icon: UserCheck },
     ]
   },
   {
@@ -69,21 +64,7 @@ export const NAV_CONFIG = [
     icon: CalendarCheck,
     roles: [UserRole.SUPER_ADMIN, UserRole.INSTITUTE_ADMIN, UserRole.BRANCH_MANAGER, UserRole.TEACHER],
     subItems: [
-      { label: 'Student Attendance', translationKey: 'studentAttendance', path: '/attendance/students', icon: CalendarCheck },
       { label: 'Teacher Attendance', translationKey: 'teacherAttendance', path: '/attendance/teachers', icon: CalendarCheck },
-      { label: 'Session Settings', translationKey: 'sessionSettings', path: '/attendance/session-settings', icon: Settings },
-    ]
-  },
-  {
-    label: 'Examinations',
-    translationKey: 'examinations',
-    path: '/exams',
-    icon: ClipboardList,
-    roles: [UserRole.SUPER_ADMIN, UserRole.INSTITUTE_ADMIN, UserRole.BRANCH_MANAGER, UserRole.TEACHER],
-    subItems: [
-      { label: 'Exams', translationKey: 'exams', path: '/exams', icon: ClipboardList },
-      { label: 'Mark Entry', translationKey: 'markEntry', path: '/exams/marks', icon: PenSquare },
-      { label: 'Results', translationKey: 'results', path: '/exams/results', icon: Award },
     ]
   },
   {

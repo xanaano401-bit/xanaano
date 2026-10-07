@@ -16,13 +16,16 @@ const {
 } = require('../utils/billingCycle');
 const { getStudentFeeForCycle } = require('../utils/studentFee');
 const { ensureCycleSnapshot } = require('../services/cycleSnapshotService');
+const CycleLock = require('../models/CycleLock');
+const { canManageCycleLocks } = require('./cycleLockController');
 
 // The wallet is populated alongside the category so reports can name the
 // institute side of a transaction: it is the sender on an expense and the
 // receiver on an income.
 const populateEntry = [
     { path: 'categoryId', select: 'title type description' },
-    { path: 'walletId', select: 'name accountNumber type' }
+    { path: 'walletId', select: 'name accountNumber type' },
+    { path: 'createdBy', select: 'fullName username role' }
 ];
 
 // Resolve the wallet an entry should affect: explicit wallet → branch's active wallet → any active wallet.
@@ -206,9 +209,16 @@ const deleteCategory = asyncHandler(async (req, res) => {
 });
 
 const getEntries = asyncHandler(async (req, res) => {
-    const data = await CashbookEntry.find()
+    const data = await CashbookEntry.find({ isDeleted: { $ne: true } })
         .populate(populateEntry)
         .sort({ date: -1, createdAt: -1 });
+    res.json(data);
+});
+
+const getDeletedEntries = asyncHandler(async (req, res) => {
+    const data = await CashbookEntry.find({ isDeleted: true })
+        .populate(populateEntry)
+        .sort({ deletedAt: -1, date: -1 });
     res.json(data);
 });
 
@@ -296,6 +306,26 @@ const createEntry = asyncHandler(async (req, res) => {
         throw new Error('No wallet found in the system. Create a wallet before recording income or expenses.');
     }
 
+    const targetCycle = req.body.targetMonth || cycleKeyForDate(date || new Date());
+    const lock = await CycleLock.findOne({ cycleKey: targetCycle, isLocked: true });
+    const isUserAdmin = canManageCycleLocks(req.user);
+
+    if (lock) {
+        if (!isUserAdmin) {
+            res.status(403);
+            throw new Error(`Wareegga xisaabeed ee ${targetCycle} waa xiran yahay (Cycle is locked). Lama gelin karo xisaab cusub ilaa maamuluhu furo.`);
+        }
+        if (!req.body.backdatedReason || !req.body.backdatedReason.trim()) {
+            res.status(400);
+            throw new Error(`Wareegga xisaabeed ee ${targetCycle} waa xiran yahay. Si aad ugu darto xisaab dib-u-saxid ah, fadlan geli Sababta Dib-u-saxidda (Backdated Reason) ama fur wareegga.`);
+        }
+    }
+
+    const isBackdated = Boolean(req.body.isBackdated || (lock && req.body.backdatedReason) || (req.body.backdatedReason && req.body.backdatedReason.trim()));
+    const backdatedReason = (req.body.backdatedReason || '').trim();
+    const adjustedByName = isBackdated ? (req.user?.fullName || req.user?.name || 'Administrator') : '';
+    const adjustedByRole = isBackdated ? (req.user?.role || 'Admin') : '';
+
     const data = await CashbookEntry.create({
         categoryId,
         amount: Number(amount),
@@ -312,11 +342,15 @@ const createEntry = asyncHandler(async (req, res) => {
         date: date || new Date().toISOString().split('T')[0],
         // targetMonth now holds a BILLING CYCLE key (25th→24th): the client's
         // chosen cycle for an advance, else the cycle of the entry's own date.
-        targetMonth: req.body.targetMonth || cycleKeyForDate(date || new Date()),
+        targetMonth: targetCycle,
         description: description || '',
         branchId,
         walletId: wallet?._id,
-        createdBy: req.user?._id
+        createdBy: req.user?._id,
+        isBackdated,
+        backdatedReason,
+        adjustedByName,
+        adjustedByRole
     });
 
     // Reflect the movement on the system wallet and record it in the transaction ledger.
@@ -473,6 +507,33 @@ const updateEntry = asyncHandler(async (req, res) => {
     if (payload.receiverPhone !== undefined) payload.receiverPhone = digitsOnly(payload.receiverPhone);
     if (payload.amount !== undefined) payload.amount = Number(payload.amount);
 
+    // Check Cycle Lock for existing and updated cycle
+    const oldCycle = existing.targetMonth || cycleKeyForDate(existing.date);
+    const newCycle = payload.targetMonth || (payload.date ? cycleKeyForDate(payload.date) : oldCycle);
+    const lockedOld = await CycleLock.findOne({ cycleKey: oldCycle, isLocked: true });
+    const lockedNew = (newCycle !== oldCycle) ? await CycleLock.findOne({ cycleKey: newCycle, isLocked: true }) : lockedOld;
+    const isUserAdmin = canManageCycleLocks(req.user);
+
+    if (lockedOld || lockedNew) {
+        if (!isUserAdmin) {
+            res.status(403);
+            throw new Error('Wareegga xisaabeed waa xiran yahay (Cycle is locked). Ma beddeli kartid xisaabtan ilaa wareegga la furo.');
+        }
+        if (!payload.backdatedReason || !payload.backdatedReason.trim()) {
+            res.status(400);
+            throw new Error('Wareegga xisaabeed waa xiran yahay. Fadlan geli Sababta Dib-u-saxidda (Backdated Reason) si aad wax uga beddesho.');
+        }
+        payload.isBackdated = true;
+        payload.backdatedReason = payload.backdatedReason.trim();
+        payload.adjustedByName = req.user?.fullName || req.user?.name || 'Administrator';
+        payload.adjustedByRole = req.user?.role || 'Admin';
+    } else if (payload.backdatedReason && payload.backdatedReason.trim()) {
+        payload.isBackdated = true;
+        payload.backdatedReason = payload.backdatedReason.trim();
+        payload.adjustedByName = req.user?.fullName || req.user?.name || 'Administrator';
+        payload.adjustedByRole = req.user?.role || 'Admin';
+    }
+
     // Empty strings for ObjectId fields must become null, otherwise Mongoose throws a Cast error.
     ['senderEntityId', 'receiverEntityId'].forEach((k) => {
         if (k in payload && !payload[k]) payload[k] = null;
@@ -525,6 +586,13 @@ const deleteEntry = asyncHandler(async (req, res) => {
         throw new Error('Transaction not found');
     }
 
+    const cycle = existing.targetMonth || cycleKeyForDate(existing.date);
+    const lock = await CycleLock.findOne({ cycleKey: cycle, isLocked: true });
+    if (lock) {
+        res.status(403);
+        throw new Error(`Wareegga xisaabeed ee ${cycle} waa xiran yahay (Cycle is locked). Ma tirtiri kartid xisaab ku jirta wareeg xiran. Fur wareegga marka hore haddii loo baahdo.`);
+    }
+
     // Reverse the wallet effect (only if one was applied) and remove linked ledger transaction(s).
     if (existing.walletId) {
         const category = await CashbookCategory.findById(existing.categoryId);
@@ -536,8 +604,63 @@ const deleteEntry = asyncHandler(async (req, res) => {
     await Payment.deleteMany({ sourceEntryId: existing._id });
     await Salary.deleteMany({ notes: new RegExp(existing._id) });
 
-    await existing.deleteOne();
-    res.json({ message: 'Transaction removed' });
+    // Mark as soft deleted instead of destroying from database
+    existing.isDeleted = true;
+    existing.deletedAt = new Date();
+    existing.deletedBy = req.user?._id;
+    existing.deletedByName = req.user?.fullName || req.user?.name || 'Administrator';
+    existing.deletedByRole = req.user?.role || 'Admin';
+    await existing.save();
+
+    res.json({ message: 'Transaction moved to trash', data: existing });
+});
+
+const restoreEntry = asyncHandler(async (req, res) => {
+    const existing = await CashbookEntry.findById(req.params.id);
+    if (!existing || !existing.isDeleted) {
+        res.status(404);
+        throw new Error('Deleted transaction not found');
+    }
+
+    const cycle = existing.targetMonth || cycleKeyForDate(existing.date);
+    const lock = await CycleLock.findOne({ cycleKey: cycle, isLocked: true });
+    if (lock) {
+        res.status(403);
+        throw new Error(`Wareegga xisaabeed ee ${cycle} waa xiran yahay (Cycle is locked). Ma soo celin kartid xisaab ku jirta wareeg xiran ilaa aad furto.`);
+    }
+
+    const category = await CashbookCategory.findById(existing.categoryId);
+    const wallet = await resolveWallet(existing.walletId, existing.branchId);
+
+    // Re-apply wallet effect & create linked transaction ledger
+    if (wallet && category) {
+        await applyWalletEffect(wallet, category.type, existing.amount, 1);
+        await Transaction.create({
+            branchId: wallet.branchId || existing.branchId || null,
+            walletId: wallet._id,
+            type: category.type,
+            amount: existing.amount,
+            referenceId: existing._id,
+            description: existing.description || `Cashbook: ${category.title} (${category.type}) [Restored]`,
+            date: existing.date,
+            createdBy: req.user?._id
+        });
+    }
+
+    // Re-sync fee payments if it was a student fee payment
+    const feeRemaining = await syncFeePayments(existing, category, req.user?._id);
+    existing.feeRemaining = feeRemaining ?? null;
+
+    // Reset soft delete flags
+    existing.isDeleted = false;
+    existing.deletedAt = null;
+    existing.deletedBy = null;
+    existing.deletedByName = '';
+    existing.deletedByRole = '';
+    await existing.save();
+
+    const populated = await CashbookEntry.findById(existing._id).populate(populateEntry);
+    res.json({ message: 'Transaction restored successfully', data: populated });
 });
 
 const lookupGuardian = async (variants) => {
@@ -1471,6 +1594,12 @@ const togglePayer = asyncHandler(async (req, res) => {
 
     // Quick-pay applies to the CURRENT billing cycle (25th→24th).
     const cycle = currentCycle();
+    const lock = await CycleLock.findOne({ cycleKey: cycle, isLocked: true });
+    if (lock) {
+        res.status(403);
+        throw new Error(`Wareegga xisaabeed ee ${cycle} waa xiran yahay (Cycle is locked). Ma beddeli kartid bixinta ardayda wareeggan xiran.`);
+    }
+
     // Exited students are excluded from quick-pay so no new money can be attached
     // to an archived student.
     const students = await Student.find({ _id: { $in: studentIds }, status: { $ne: 'Exited' } })
@@ -1549,9 +1678,11 @@ module.exports = {
     updateCategory,
     deleteCategory,
     getEntries,
+    getDeletedEntries,
     createEntry,
     updateEntry,
     deleteEntry,
+    restoreEntry,
     lookupPhone,
     getPayers,
     togglePayer,

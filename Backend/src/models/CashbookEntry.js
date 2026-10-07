@@ -87,6 +87,50 @@ const cashbookEntrySchema = new mongoose.Schema({
     createdBy: {
         type: mongoose.Schema.Types.ObjectId,
         ref: 'User'
+    },
+    // Backdated adjustment tracking
+    isBackdated: {
+        type: Boolean,
+        default: false
+    },
+    backdatedReason: {
+        type: String,
+        default: '',
+        trim: true
+    },
+    adjustedByName: {
+        type: String,
+        default: '',
+        trim: true
+    },
+    adjustedByRole: {
+        type: String,
+        default: '',
+        trim: true
+    },
+    // Soft delete tracking (Recycle Bin / Trash)
+    isDeleted: {
+        type: Boolean,
+        default: false,
+        index: true
+    },
+    deletedAt: {
+        type: Date,
+        default: null
+    },
+    deletedBy: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'User'
+    },
+    deletedByName: {
+        type: String,
+        default: '',
+        trim: true
+    },
+    deletedByRole: {
+        type: String,
+        default: '',
+        trim: true
     }
 }, { timestamps: true });
 

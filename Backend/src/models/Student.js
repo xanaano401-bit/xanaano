@@ -80,6 +80,26 @@ const studentSchema = new mongoose.Schema({
         enum: ['Active', 'Inactive', 'Graduated', 'Exited'],
         default: 'Active'
     },
+    // Sababta loosoo xiray / loo keenay (Reason for Admission)
+    admissionReason: {
+        type: String,
+        default: '',
+        trim: true
+    },
+    // Xanuunada uu qabo / Xaaladda Caafimaad (Medical & Health Notes)
+    healthConditions: {
+        type: String,
+        default: '',
+        trim: true
+    },
+    // Document / Warqad Caafimaad (Medical Document Attachment)
+    medicalDocument: {
+        fileName: { type: String, default: '' },
+        fileType: { type: String, default: '' },
+        fileData: { type: String, default: '' },
+        fileSize: { type: Number, default: 0 },
+        uploadedAt: { type: Date, default: null }
+    },
     // Exit / Archive metadata. Set only when a student is exited; the student
     // record itself (id, fees, history) is never deleted or altered by an exit.
     exitReason: {

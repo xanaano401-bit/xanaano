@@ -12,6 +12,13 @@ const { assertJwtSecret } = require('./config/jwt');
 // with insecure defaults.
 assertJwtSecret();
 
+process.on('uncaughtException', (err) => {
+    console.error('[UNCAUGHT EXCEPTION]:', err);
+});
+process.on('unhandledRejection', (reason) => {
+    console.error('[UNHANDLED REJECTION]:', reason);
+});
+
 // Connect to Database and auto-seed admin
 const seedAdminUser = async () => {
     try {
@@ -94,7 +101,8 @@ app.use(cors({
     origin: allowedOrigins.length ? allowedOrigins : true,
     credentials: true
 }));
-app.use(express.json({ limit: '5mb' }));
+app.use(express.json({ limit: '25mb' }));
+app.use(express.urlencoded({ limit: '25mb', extended: true }));
 
 // Routes
 app.use('/api/users', require('./routes/userRoutes'));
@@ -115,6 +123,8 @@ app.use('/api/cashbook', require('./routes/cashbookRoutes'));
 app.use('/api/expenses', require('./routes/expenseRoutes'));
 app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/quran/surahs', require('./routes/quranSurahRoutes'));
+app.use('/api/quran/lessons', require('./routes/quranLessonRoutes'));
+app.use('/api/cycle-locks', require('./routes/cycleLockRoutes'));
 
 // Unchanged AI/Analytics/Dashboard/Settings routes if they are generic, 
 // but we deleted their routes. We can re-add them if needed, but since we deleted them let's remove.

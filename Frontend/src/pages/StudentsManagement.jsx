@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Plus, X, Edit2, Trash2, Users, Search, CheckCircle2, UserPlus, Loader2, 
   DollarSign, IdCard as IdCardIcon, Download, Upload, FileSpreadsheet, AlertCircle,
-  LayoutGrid, List, Filter, GraduationCap, Phone, Calendar, BookOpen, Sparkles, User as UserIcon, LogOut
+  LayoutGrid, List, Filter, GraduationCap, Phone, Calendar, BookOpen, Sparkles, User as UserIcon, LogOut,
+  HeartPulse, FileText, UploadCloud, Eye, Paperclip
 } from 'lucide-react';
 import api from '../services/api';
 import { useAlert } from '../components/common/alerts/useAlert';
@@ -299,6 +300,9 @@ const StudentsManagement = () => {
     return `${d}/${m}/${y}`;
   };
 
+  const [viewingStudent, setViewingStudent] = useState(null);
+  const docInputRef = useRef(null);
+
   const [formData, setFormData] = useState({
     fullName: '',
     classId: '',
@@ -312,7 +316,10 @@ const StudentsManagement = () => {
     guardianName: '',
     guardianRelationship: 'Father',
     guardianAltPhone: '',
-    registrationDate: toDateInput(new Date())
+    registrationDate: toDateInput(new Date()),
+    admissionReason: '',
+    healthConditions: '',
+    medicalDocument: null
   });
 
   const fetchData = async () => {
@@ -636,9 +643,58 @@ const StudentsManagement = () => {
   };
 
 
+  const handleDocumentChange = (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 15 * 1024 * 1024) {
+      showAlert({
+        type: 'warning',
+        title: t('common.validationError'),
+        message: 'Faylku kama weynaan karo 15MB'
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (uploadEvent) => {
+      setFormData(prev => ({
+        ...prev,
+        medicalDocument: {
+          fileName: file.name,
+          fileType: file.type || 'application/octet-stream',
+          fileSize: file.size,
+          fileData: uploadEvent.target.result,
+          uploadedAt: new Date().toISOString()
+        }
+      }));
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveDocument = () => {
+    setFormData(prev => ({ ...prev, medicalDocument: null }));
+    if (docInputRef.current) docInputRef.current.value = '';
+  };
+
+  const handleDownloadDocument = (doc) => {
+    if (!doc || !doc.fileData) return;
+    try {
+      const link = document.createElement('a');
+      link.href = doc.fileData;
+      link.download = doc.fileName || 'medical-document';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } catch (err) {
+      console.error('Failed to download document', err);
+    }
+  };
+
   const openAddModal = () => {
     setEditingItem(null);
     setFoundGuardian(null);
+    if (docInputRef.current) docInputRef.current.value = '';
     setFormData({
       fullName: '',
       classId: classes[0]?._id || '',
@@ -652,13 +708,17 @@ const StudentsManagement = () => {
       guardianPhone: '',
       guardianAlternatePhone: '',
       guardianRelationship: 'Father',
-      registrationDate: toDateInput()
+      registrationDate: toDateInput(),
+      admissionReason: '',
+      healthConditions: '',
+      medicalDocument: null
     });
     setIsModalOpen(true);
   };
 
   const openEditModal = (item) => {
     setEditingItem(item);
+    if (docInputRef.current) docInputRef.current.value = '';
     const existingG = item.guardianId && typeof item.guardianId === 'object' ? item.guardianId : null;
     setFoundGuardian(existingG);
     setFormData({
@@ -676,7 +736,10 @@ const StudentsManagement = () => {
       guardianRelationship: existingG?.relationship || 'Father',
       // Show the date already stored on the record. Only a student that somehow
       // has none falls back to today, so editing never rewrites a saved date.
-      registrationDate: item.registrationDate ? toDateInput(item.registrationDate) : toDateInput()
+      registrationDate: item.registrationDate ? toDateInput(item.registrationDate) : toDateInput(),
+      admissionReason: item.admissionReason || '',
+      healthConditions: item.healthConditions || '',
+      medicalDocument: item.medicalDocument || null
     });
     setIsModalOpen(true);
   };
@@ -720,6 +783,9 @@ const StudentsManagement = () => {
         fatherName: formData.guardianName || formData.fatherName || '',
         fatherPhone: formData.guardianPhone || formData.fatherPhone || '',
         guardianId: guardianId || undefined,
+        admissionReason: formData.admissionReason || '',
+        healthConditions: formData.healthConditions || '',
+        medicalDocument: formData.medicalDocument || null,
         // Sent only when the field holds a date, so clearing the input can never
         // blank a registration date already stored against the student.
         ...(formData.registrationDate ? { registrationDate: formData.registrationDate } : {})
@@ -1051,9 +1117,21 @@ const StudentsManagement = () => {
                       <h4 className="text-base font-extrabold text-slate-900 dark:text-white truncate leading-tight group-hover:text-emerald-600 dark:group-hover:text-emerald-400 transition-colors" title={item.fullName}>
                         {item.fullName}
                       </h4>
-                      <span className="inline-block mt-1 font-mono text-xs font-black text-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-lg border border-emerald-500/20">
-                        {item.studentCode || t('attendance.student.noId')}
-                      </span>
+                      <div className="flex items-center gap-1.5 flex-wrap mt-1">
+                        <span className="font-mono text-xs font-black text-emerald-500 bg-emerald-50 dark:bg-emerald-950/40 px-2 py-0.5 rounded-lg border border-emerald-500/20">
+                          {item.studentCode || t('attendance.student.noId')}
+                        </span>
+                        {(item.healthConditions || item.medicalDocument?.fileData) && (
+                          <span 
+                            title={item.healthConditions || t('students.hasMedicalRecord')}
+                            className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded-md bg-rose-50 dark:bg-rose-950/40 text-rose-600 dark:text-rose-400 text-[10px] font-bold border border-rose-500/20"
+                          >
+                            <HeartPulse size={10} />
+                            {item.medicalDocument?.fileData && <Paperclip size={9} />}
+                            {t('students.hasMedicalRecord')}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
 
@@ -1110,6 +1188,13 @@ const StudentsManagement = () => {
                     {item.registrationDate ? fmtRegDate(item.registrationDate) : t('common.notAvailable')}
                   </span>
                   <div className="flex items-center gap-1.5">
+                    <button 
+                      onClick={() => setViewingStudent(item)} 
+                      title={t('students.viewDetails')} 
+                      className="p-2 bg-slate-100 dark:bg-slate-800 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 text-slate-600 dark:text-slate-300 hover:text-emerald-600 rounded-xl transition-colors"
+                    >
+                      <Eye size={15} />
+                    </button>
                     <button 
                       onClick={() => setCardStudent(item)} 
                       title={t('academic.teachers.idCard')} 
@@ -1177,7 +1262,19 @@ const StudentsManagement = () => {
                             <span className="font-bold text-sm text-slate-900 dark:text-white block truncate max-w-[200px]" title={item.fullName}>
                               {item.fullName}
                             </span>
-                            <span className="text-[10px] text-slate-400 font-semibold uppercase">{tv(item.gender || 'Male')}</span>
+                            <div className="flex items-center gap-1.5 mt-0.5">
+                              <span className="text-[10px] text-slate-400 font-semibold uppercase">{tv(item.gender || 'Male')}</span>
+                              {(item.healthConditions || item.medicalDocument?.fileData) && (
+                                <span 
+                                  title={item.healthConditions || t('students.hasMedicalRecord')} 
+                                  className="inline-flex items-center gap-1 px-1.5 py-0.2 rounded bg-rose-500/10 text-rose-600 dark:text-rose-400 text-[9px] font-bold border border-rose-500/20"
+                                >
+                                  <HeartPulse size={9} />
+                                  {item.medicalDocument?.fileData && <Paperclip size={8} />}
+                                  {t('students.hasMedicalRecord')}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
                       </td>
@@ -1226,6 +1323,9 @@ const StudentsManagement = () => {
                       </td>
                       <td className="px-4 py-3.5 text-right whitespace-nowrap">
                         <div className="flex justify-end items-center gap-1.5">
+                          <button onClick={() => setViewingStudent(item)} title={t('students.viewDetails')} className="p-1.5 bg-slate-50 dark:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-all">
+                            <Eye size={15} />
+                          </button>
                           <button onClick={() => setCardStudent(item)} title={t('academic.teachers.idCard')} className="p-1.5 bg-slate-50 dark:bg-slate-800 rounded-lg text-slate-600 dark:text-slate-300 hover:text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/40 transition-all">
                             <IdCardIcon size={15} />
                           </button>
@@ -1500,6 +1600,111 @@ const StudentsManagement = () => {
                 )}
               </div>
 
+              {/* Sababta loosoo xiray / loo keenay (Admission Information Section) */}
+              <div className="border-t border-slate-100 dark:border-slate-800 pt-4 mt-2">
+                <div className="text-xs font-black uppercase tracking-wider text-emerald-600 dark:text-emerald-400 mb-2 flex items-center gap-1.5">
+                  <BookOpen size={14} />
+                  {t('students.admissionSection')}
+                </div>
+                <div>
+                  <label className="block text-xs font-black uppercase text-slate-500 mb-1">
+                    {t('students.admissionReason')}
+                  </label>
+                  <textarea
+                    rows={2}
+                    placeholder={t('students.admissionReasonPlaceholder')}
+                    value={formData.admissionReason}
+                    onChange={(e) => setFormData({ ...formData, admissionReason: e.target.value })}
+                    className="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none text-slate-900 dark:text-white resize-none text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Xogta Caafimaadka & Xanuunada (Health Conditions & Medical Info Section) */}
+              <div className="border-t border-slate-100 dark:border-slate-800 pt-4 mt-2">
+                <div className="text-xs font-black uppercase tracking-wider text-rose-600 dark:text-rose-400 mb-2 flex items-center gap-1.5">
+                  <HeartPulse size={14} />
+                  {t('students.healthSection')}
+                </div>
+                
+                <div className="space-y-3">
+                  {/* Qoraalka Xanuunada */}
+                  <div>
+                    <label className="block text-xs font-black uppercase text-slate-500 mb-1">
+                      {t('students.healthConditions')}
+                    </label>
+                    <textarea
+                      rows={2}
+                      placeholder={t('students.healthConditionsPlaceholder')}
+                      value={formData.healthConditions}
+                      onChange={(e) => setFormData({ ...formData, healthConditions: e.target.value })}
+                      className="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none text-slate-900 dark:text-white resize-none text-sm"
+                    />
+                  </div>
+
+                  {/* Document-ka Caafimaadka */}
+                  <div>
+                    <label className="block text-xs font-black uppercase text-slate-500 mb-1">
+                      {t('students.medicalDocument')}
+                    </label>
+                    
+                    <input
+                      type="file"
+                      ref={docInputRef}
+                      onChange={handleDocumentChange}
+                      accept=".pdf,.png,.jpg,.jpeg,.doc,.docx"
+                      className="hidden"
+                    />
+
+                    {formData.medicalDocument?.fileData ? (
+                      <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/30 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <div className="w-9 h-9 rounded-xl bg-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                            <FileText size={18} />
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-xs font-bold text-slate-900 dark:text-white truncate max-w-[220px]">
+                              {formData.medicalDocument.fileName || 'document.pdf'}
+                            </p>
+                            <p className="text-[10px] text-slate-400 font-mono">
+                              {formData.medicalDocument.fileSize ? `${Math.round(formData.medicalDocument.fileSize / 1024)} KB` : 'Attached'}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => handleDownloadDocument(formData.medicalDocument)}
+                            className="p-2 rounded-xl bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 hover:text-rose-600 transition-colors shadow-sm"
+                            title={t('students.downloadDocument')}
+                          >
+                            <Download size={14} />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={handleRemoveDocument}
+                            className="p-2 rounded-xl bg-white dark:bg-slate-800 text-rose-500 hover:bg-rose-100 dark:hover:bg-rose-950 transition-colors shadow-sm"
+                            title={t('students.removeDocument')}
+                          >
+                            <Trash2 size={14} />
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={() => docInputRef.current?.click()}
+                        className="w-full py-3 px-4 rounded-2xl border-2 border-dashed border-slate-200 dark:border-slate-700 hover:border-rose-400 dark:hover:border-rose-500 bg-slate-50 dark:bg-slate-800/50 hover:bg-rose-50/50 dark:hover:bg-rose-950/20 transition-all flex items-center justify-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300"
+                      >
+                        <UploadCloud size={16} className="text-rose-500" />
+                        <span>{t('students.uploadDocument')}</span>
+                        <span className="text-[10px] text-slate-400 font-normal">({t('students.uploadDocumentHint')})</span>
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
               <div className="flex justify-end gap-3 pt-4 border-t border-slate-100 dark:border-slate-800">
                 <button
                   type="button"
@@ -1531,6 +1736,136 @@ const StudentsManagement = () => {
           { label: t('common.guardian'), value: cardStudent?.guardianId?.fullName || cardStudent?.fatherName || '' }
         ]}
       />
+
+      {/* Student Full Details / Profile Modal */}
+      {viewingStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm" onClick={() => setViewingStudent(null)}>
+          <div className="bg-white dark:bg-slate-900 rounded-[32px] p-6 sm:p-8 max-w-lg w-full shadow-2xl border border-slate-100 dark:border-slate-800 animate-in zoom-in-95 duration-200 max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex justify-between items-center mb-5 pb-4 border-b border-slate-100 dark:border-slate-800">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-500 text-white flex items-center justify-center font-black text-lg shadow-md">
+                  {(viewingStudent.fullName || 'A').charAt(0).toUpperCase()}
+                </div>
+                <div>
+                  <h3 className="text-lg font-black text-slate-900 dark:text-white leading-tight">
+                    {viewingStudent.fullName}
+                  </h3>
+                  <span className="font-mono text-xs font-bold text-emerald-600 dark:text-emerald-400">
+                    {viewingStudent.studentCode || '—'}
+                  </span>
+                </div>
+              </div>
+              <button onClick={() => setViewingStudent(null)} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-white rounded-full">
+                <X size={20} />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Basic Info Grid */}
+              <div className="grid grid-cols-2 gap-3 text-xs">
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60">
+                  <span className="text-slate-400 font-bold uppercase text-[10px] block">{t('common.class')}</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200 text-sm">
+                    {classLabel(viewingStudent.classId, viewingStudent.classId?.name || '—')}
+                  </span>
+                </div>
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60">
+                  <span className="text-slate-400 font-bold uppercase text-[10px] block">{t('students.colFee')}</span>
+                  <span className="font-black text-emerald-600 dark:text-emerald-400 text-sm">
+                    ${Number(viewingStudent.monthlyFee !== undefined ? viewingStudent.monthlyFee : (viewingStudent.fee || 0)).toLocaleString()}
+                  </span>
+                </div>
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60">
+                  <span className="text-slate-400 font-bold uppercase text-[10px] block">{t('common.gender')}</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200">
+                    {tv(viewingStudent.gender || 'Male')}
+                  </span>
+                </div>
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60">
+                  <span className="text-slate-400 font-bold uppercase text-[10px] block">{t('students.colRegDate')}</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200">
+                    {viewingStudent.registrationDate ? fmtRegDate(viewingStudent.registrationDate) : '—'}
+                  </span>
+                </div>
+              </div>
+
+              {/* Guardian / Payer */}
+              <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 text-xs">
+                <span className="text-slate-400 font-bold uppercase text-[10px] block mb-1">{t('students.whoPaysSection')}</span>
+                <p className="font-bold text-slate-900 dark:text-white text-sm">
+                  {viewingStudent.guardianId?.fullName || viewingStudent.fatherName || '—'}
+                </p>
+                <div className="flex items-center gap-3 mt-1 text-[11px] font-mono text-slate-600 dark:text-slate-300 flex-wrap">
+                  <span>{t('academic.guardians.phone1')}: <strong className="text-emerald-600">{viewingStudent.guardianId?.phone || viewingStudent.fatherPhone || '—'}</strong></span>
+                  {viewingStudent.guardianId?.alternatePhone && (
+                    <span>{t('academic.guardians.phone2')}: <strong className="text-blue-600">{viewingStudent.guardianId.alternatePhone}</strong></span>
+                  )}
+                  {viewingStudent.guardianId?.relationship && (
+                    <span className="text-slate-400">({t(`academic.guardians.relationships.${viewingStudent.guardianId.relationship}`, { defaultValue: tv(viewingStudent.guardianId.relationship) })})</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Admission Reason */}
+              <div className="p-3.5 rounded-2xl bg-emerald-500/10 border border-emerald-500/20 text-xs">
+                <span className="text-emerald-700 dark:text-emerald-400 font-bold uppercase text-[10px] flex items-center gap-1.5 mb-1">
+                  <BookOpen size={12} />
+                  {t('students.admissionReason')}
+                </span>
+                <p className="text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">
+                  {viewingStudent.admissionReason || <span className="text-slate-400 italic">Sabab gaar ah lama qorin</span>}
+                </p>
+              </div>
+
+              {/* Medical & Health Conditions */}
+              <div className="p-3.5 rounded-2xl bg-rose-500/10 border border-rose-500/20 text-xs">
+                <span className="text-rose-700 dark:text-rose-400 font-bold uppercase text-[10px] flex items-center gap-1.5 mb-1">
+                  <HeartPulse size={12} />
+                  {t('students.healthConditions')}
+                </span>
+                <p className="text-slate-800 dark:text-slate-200 whitespace-pre-wrap leading-relaxed">
+                  {viewingStudent.healthConditions || <span className="text-slate-400 italic">Wax xanuun ama xasaasiyad ah looma diiwaangelin</span>}
+                </p>
+
+                {/* Medical Document */}
+                {viewingStudent.medicalDocument?.fileData && (
+                  <div className="mt-3 pt-3 border-t border-rose-500/20 flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <FileText size={16} className="text-rose-500 shrink-0" />
+                      <span className="font-bold text-slate-800 dark:text-slate-200 truncate max-w-[200px]">
+                        {viewingStudent.medicalDocument.fileName || 'document.pdf'}
+                      </span>
+                      {viewingStudent.medicalDocument.fileSize ? (
+                        <span className="text-[10px] text-slate-400 font-mono">
+                          ({Math.round(viewingStudent.medicalDocument.fileSize / 1024)} KB)
+                        </span>
+                      ) : null}
+                    </div>
+                    <button
+                      type="button"
+                      onClick={() => handleDownloadDocument(viewingStudent.medicalDocument)}
+                      className="px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-sm transition-colors shrink-0"
+                    >
+                      <Download size={13} />
+                      <span>{t('students.downloadDocument')}</span>
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-6 flex justify-end">
+              <button
+                type="button"
+                onClick={() => setViewingStudent(null)}
+                className="px-6 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 font-bold text-xs uppercase"
+              >
+                {t('common.cancel')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Exit Student confirmation modal */}
       {exitingStudent && (

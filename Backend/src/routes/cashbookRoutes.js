@@ -6,9 +6,11 @@ const {
     updateCategory,
     deleteCategory,
     getEntries,
+    getDeletedEntries,
     createEntry,
     updateEntry,
     deleteEntry,
+    restoreEntry,
     lookupPhone,
     getPayers,
     togglePayer
@@ -52,6 +54,9 @@ router.route('/categories/:id')
 router.route('/entries')
     .get(protect, canReadCashbook, getEntries)
     .post(protect, canWriteCashbook, createEntry);
+
+router.get('/deleted-entries', protect, canReadCashbook, getDeletedEntries);
+router.post('/entries/:id/restore', protect, canWriteCashbook, restoreEntry);
 
 router.route('/entries/:id')
     .put(protect, canWriteCashbook, updateEntry)
