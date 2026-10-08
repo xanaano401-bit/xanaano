@@ -872,39 +872,39 @@ const CashbookManagement = () => {
           </div>
         </div>
 
-        <div className="flex rounded-[20px] border border-slate-200 dark:border-slate-700 overflow-hidden shadow-sm">
+        <div className="inline-flex items-center p-1 bg-slate-100 dark:bg-slate-900/90 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-sm gap-1 overflow-x-auto max-w-full">
           <button
             type="button"
             onClick={() => setActivePanel('category')}
-            className={`flex items-center gap-2 px-8 py-4 text-[11px] font-black uppercase tracking-[0.15em] transition-all ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all whitespace-nowrap ${
               activePanel === 'category'
-                ? 'bg-brand-600 text-white'
-                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                ? 'bg-brand-600 text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/80 dark:hover:bg-slate-800'
             }`}
           >
-            <Tags size={16} /> {t('common.category')}
+            <Tags size={14} /> {t('common.category')}
           </button>
           <button
             type="button"
             onClick={() => setActivePanel('transaction')}
-            className={`flex items-center gap-2 px-8 py-4 text-[11px] font-black uppercase tracking-[0.15em] transition-all ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all whitespace-nowrap ${
               activePanel === 'transaction'
-                ? 'bg-brand-600 text-white'
-                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                ? 'bg-brand-600 text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/80 dark:hover:bg-slate-800'
             }`}
           >
-            <ArrowLeftRight size={16} /> {t('cashbook.transaction')}
+            <ArrowLeftRight size={14} /> {t('cashbook.transaction')}
           </button>
           <button
             type="button"
             onClick={() => setActivePanel('cycleLocks')}
-            className={`flex items-center gap-2 px-8 py-4 text-[11px] font-black uppercase tracking-[0.15em] transition-all ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all whitespace-nowrap ${
               activePanel === 'cycleLocks'
-                ? 'bg-brand-600 text-white'
-                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                ? 'bg-brand-600 text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/80 dark:hover:bg-slate-800'
             }`}
           >
-            <Lock size={16} /> {t('cashbook.cycleLocks')}
+            <Lock size={14} /> {t('cashbook.cycleLocks')}
             {cycleLocks.some((l) => l.isLocked) && (
               <span className="w-2 h-2 rounded-full bg-rose-500 animate-pulse ml-0.5" />
             )}
@@ -912,15 +912,15 @@ const CashbookManagement = () => {
           <button
             type="button"
             onClick={() => setActivePanel('trash')}
-            className={`flex items-center gap-2 px-8 py-4 text-[11px] font-black uppercase tracking-[0.15em] transition-all ${
+            className={`flex items-center gap-1.5 px-3.5 py-2 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all whitespace-nowrap ${
               activePanel === 'trash'
-                ? 'bg-rose-600 text-white'
-                : 'bg-white dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'
+                ? 'bg-rose-600 text-white shadow-sm'
+                : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/80 dark:hover:bg-slate-800'
             }`}
           >
-            <Trash2 size={16} /> {t('cashbook.trash')}
+            <Trash2 size={14} /> {t('cashbook.trash')}
             {deletedEntries.length > 0 && (
-              <span className={`px-2 py-0.5 rounded-full text-[10px] font-mono font-bold ${
+              <span className={`px-1.5 py-0.5 rounded-full text-[9px] font-mono font-bold ${
                 activePanel === 'trash' ? 'bg-white/20 text-white' : 'bg-rose-100 dark:bg-rose-950/60 text-rose-700 dark:text-rose-300'
               }`}>
                 {deletedEntries.length}
