@@ -19,6 +19,7 @@ import { currentCycle, cycleKeyForDate, cycleShortLabel, cycleLabel, addCycles }
 const SHEET_COLUMNS = [
   { header: 'Student ID', key: 'studentId', width: 14 },
   { header: 'Magaca Ardayda', key: 'fullName', width: 28 },
+  { header: 'Gender', key: 'gender', width: 12 },
   { header: 'Magaca Masuul', key: 'guardianName', width: 24 },
   { header: 'Number Masuulka', key: 'guardianPhone', width: 18 },
   { header: 'Sababta Loosoo Xiray', key: 'admissionReason', width: 26 },
@@ -32,6 +33,7 @@ const SHEET_NAME = 'Students';
 const COLUMN_ALIASES = {
   studentId: ['student id', 'aqoonsiga ardayga', 'id'],
   fullName: ['magaca ardayda', 'magaca ardayga', 'magaca oo buuxa', 'full name', 'student name', 'name'],
+  gender: ['gender', 'jinsiga', 'sex'],
   guardianName: ['magaca masuul', 'magaca masuulka', 'magaca bixiyaha', 'fee payer name', 'payer name', 'guardian name', 'parent name', 'father name', 'magaca aabbaha'],
   guardianPhone: ['number masuulka', 'mnumber masuulka', 'lambar masuul', 'lambarka masuulka', 'telefoonka masuulka', 'telefoonka bixiyaha', 'guardian phone', 'fee payer phone', 'phone', 'payer phone', 'father phone', 'telefoonka aabbaha'],
   admissionReason: ['sababta losoo xiray', 'sababta loosoo xiray', 'sababta loosoo xiray / loo keenay', 'sababta', 'admission reason', 'reason'],
@@ -443,6 +445,7 @@ const StudentsManagement = () => {
     sheet.addRow({
       studentId: t('students.sheet.leaveBlank'),
       fullName: t('students.sheet.exampleName'),
+      gender: valueLabel('gender', 'Male', language),
       guardianName: t('students.sheet.exampleGuardian') || 'Cali Xasan',
       guardianPhone: '0615551234',
       admissionReason: t('students.sheet.exampleReason') || 'Daryeel & Waxbarasho',
@@ -465,8 +468,8 @@ const StudentsManagement = () => {
   };
 
   // ── Export ────────────────────────────────────────────────────────────────
-  // Exactly the 8 requested columns:
-  // student id, Magaca ardayda, Magaca Masuul, number masuulka,
+  // Columns:
+  // student id, Magaca ardayda, Gender, Magaca Masuul, number masuulka,
   // Sababta losoo xiray, Relationship, Lacagta Bisha, Xanuuna uuqabo
   const handleExport = async () => {
     const ExcelJS = await loadExcelJS();
@@ -480,6 +483,7 @@ const StudentsManagement = () => {
       sheet.addRow({
         studentId: item.studentCode || '',
         fullName: item.fullName || '',
+        gender: item.gender ? valueLabel('gender', item.gender, language) : (item.gender || 'Male'),
         guardianName: guardian?.fullName || item.fatherName || '',
         guardianPhone: guardian?.phone || item.fatherPhone || '',
         admissionReason: item.admissionReason || '',

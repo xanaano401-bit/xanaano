@@ -67,7 +67,7 @@ export default {
     sheet: {
       sheetName: 'Students', instructionsName: 'Instructions', templateFile: 'Student_Import_Template.xlsx', exportFile: 'Students',
       leaveBlank: '(leave blank)', exampleName: 'Ahmed Ali', exampleGuardian: 'Ali Hassan', noneYet: '(none yet)',
-      studentId: 'Student ID', fullName: 'Student Name', guardianName: 'Guardian Name', guardianPhone: 'Guardian Phone',
+      studentId: 'Student ID', fullName: 'Student Name', gender: 'Gender', guardianName: 'Guardian Name', guardianPhone: 'Guardian Phone',
       admissionReason: 'Admission Reason', relationship: 'Relationship', monthlyFee: 'Monthly Fee', healthConditions: 'Health Conditions',
       exampleReason: 'Daycare & Learning', exampleHealth: 'None',
       instructionsTop: [
@@ -77,6 +77,7 @@ export default {
         '',
         'Student ID         — leave blank. The system issues it automatically (1001, 1002, …).',
         'Student Name       — required.',
+        'Gender             — Male or Female. Defaults to Male.',
         'Guardian Name      — guardian / payer name.',
         'Guardian Phone     — guardian / payer mobile phone number.',
         'Admission Reason   — reason for admission / daycare.',
@@ -155,7 +156,7 @@ export default {
     sheet: {
       sheetName: 'Ardayda', instructionsName: 'Tilmaamaha', templateFile: 'Qaabka_Soo_Gelinta_Ardayda.xlsx', exportFile: 'Ardayda',
       leaveBlank: '(ka tag madhan)', exampleName: 'Axmed Cali', exampleGuardian: 'Cali Xasan', noneYet: '(weli ma jiraan)',
-      studentId: 'Student ID', fullName: 'Magaca Ardayda', guardianName: 'Magaca Masuul', guardianPhone: 'Number Masuulka',
+      studentId: 'Student ID', fullName: 'Magaca Ardayda', gender: 'Gender', guardianName: 'Magaca Masuul', guardianPhone: 'Number Masuulka',
       admissionReason: 'Sababta Loosoo Xiray', relationship: 'Relationship', monthlyFee: 'Lacagta Bisha', healthConditions: 'Xanuunada Uu Qabo',
       exampleReason: 'Daryeel & Waxbarasho', exampleHealth: 'Ma jiro',
       instructionsTop: [
@@ -165,6 +166,7 @@ export default {
         '',
         'Student ID        — ka tag madhan. Nidaamka ayaa si toos ah u bixinaya (1001, 1002, …).',
         'Magaca Ardayda    — qasab (magaca ardayga oo buuxa).',
+        'Gender            — Male (Lab) ama Female (Dhedig). Caadi ahaan waa Male.',
         'Magaca Masuul     — magaca qofka masuulka ka ah ama bixiyaha.',
         'Number Masuulka   — lambarka telefoonka ee masuulka / bixiyaha.',
         'Sababta Loosoo Xiray — sababta ilmaha loo keenay / loosoo xiray.',
