@@ -81,8 +81,8 @@
 
 ### 1. Soo Degso Mashruuca (Clone Repository)
 ```bash
-git clone https://github.com/salaaxudaareyn81-tech/salaaxu-aldareyn.git
-cd salaaxu-aldareyn
+git clone https://github.com/xanaano401-bit/xanaano.git
+cd xanaano
 ```
 
 ### 2. Kici Backend-ka (Server)
@@ -104,14 +104,25 @@ npm start
 
 ---
 
-## 🌐 Sida Vercel Loogu Saaro (Deploying on Vercel)
+## 🌐 Sida Loo Kiciyo Online (Render & Vercel Deployment)
 
-Mashruucani wuxuu horey u leeyahay habaynta [`vercel.json`](vercel.json):
+### 1. Backend-ka ku saar Render:
+1. Gal [Render.com](https://render.com) oo ku gal akoonkaaga GitHub.
+2. Dooro **New +** ➔ **Blueprint** (wuxuu si toos ah u aqrinayaa [`render.yaml`](render.yaml)) AMA dooro **Web Service**.
+3. Dooro repository-ga **`xanaano401-bit/xanaano`**.
+4. Haddii aad gacanta ku dhisayso:
+   - **Root Directory**: `Backend`
+   - **Build Command**: `npm install`
+   - **Start Command**: `npm start`
+5. Geli **Environment Variables** (sida `MONGO_URI`, `JWT_SECRET`).
 
+### 2. Frontend-ka ku saar Vercel:
 1. Gal [Vercel.com](https://vercel.com) oo ku gal akoonkaaga GitHub.
 2. Guji **Add New...** ➔ **Project**.
-3. Dooro repository-ga **`salaaxu-aldareyn`** ka dibna guji **Import**.
-4. Guji **Deploy** — nidaamku si toos ah ayuu u dhismi doonaa!
+3. Dooro repository-ga **`xanaano401-bit/xanaano`** ka dibna guji **Import**.
+4. Geli Environment Variable:
+   - `VITE_API_URL` = Cinwaanka Render Backend (tusaale: `https://xanaano-backend.onrender.com`).
+5. Guji **Deploy** — nidaamku si toos ah ayuu u dhismi doonaa!
 
 ---
 
