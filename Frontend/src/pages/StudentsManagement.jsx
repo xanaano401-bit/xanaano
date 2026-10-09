@@ -3,7 +3,7 @@ import {
   Plus, X, Edit2, Trash2, Users, Search, CheckCircle2, UserPlus, Loader2, 
   DollarSign, IdCard as IdCardIcon, Download, Upload, FileSpreadsheet, AlertCircle,
   LayoutGrid, List, Filter, GraduationCap, Phone, Calendar, BookOpen, Sparkles, User as UserIcon, LogOut,
-  HeartPulse, FileText, UploadCloud, Eye, Paperclip
+  HeartPulse, FileText, UploadCloud, Eye, Paperclip, Building2
 } from 'lucide-react';
 import api from '../services/api';
 import { useAlert } from '../components/common/alerts/useAlert';
@@ -20,6 +20,7 @@ const SHEET_COLUMNS = [
   { header: 'Student ID', key: 'studentId', width: 14 },
   { header: 'Magaca Ardayda', key: 'fullName', width: 28 },
   { header: 'Gender', key: 'gender', width: 12 },
+  { header: 'Xarunta', key: 'branchName', width: 20 },
   { header: 'Magaca Masuul', key: 'guardianName', width: 24 },
   { header: 'Number Masuulka', key: 'guardianPhone', width: 18 },
   { header: 'Sababta Loosoo Xiray', key: 'admissionReason', width: 26 },
@@ -34,6 +35,7 @@ const COLUMN_ALIASES = {
   studentId: ['student id', 'aqoonsiga ardayga', 'id'],
   fullName: ['magaca ardayda', 'magaca ardayga', 'magaca oo buuxa', 'full name', 'student name', 'name'],
   gender: ['gender', 'jinsiga', 'sex'],
+  branchName: ['xarunta', 'xarun', 'laanta', 'branch', 'branch name', 'magaca xarunta', 'campus'],
   guardianName: ['magaca masuul', 'magaca masuulka', 'magaca bixiyaha', 'fee payer name', 'payer name', 'guardian name', 'parent name', 'father name', 'magaca aabbaha'],
   guardianPhone: ['number masuulka', 'mnumber masuulka', 'lambar masuul', 'lambarka masuulka', 'telefoonka masuulka', 'telefoonka bixiyaha', 'guardian phone', 'fee payer phone', 'phone', 'payer phone', 'father phone', 'telefoonka aabbaha'],
   admissionReason: ['sababta losoo xiray', 'sababta loosoo xiray', 'sababta loosoo xiray / loo keenay', 'sababta', 'admission reason', 'reason'],
@@ -253,6 +255,22 @@ const resolveClassFromCell = (cell, classes = []) => {
   };
 };
 
+const resolveBranchFromCell = (cell, branches = []) => {
+  const rawCell = String(cell ?? '').replace(/\u00A0/g, ' ').trim();
+  if (!rawCell) return { branch: null };
+  const cleanCell = cleanStr(rawCell);
+  const directMatch = branches.find(b => cleanStr(b.name) === cleanCell);
+  if (directMatch) return { branch: directMatch };
+  const looseMatch = branches.find(b => {
+    const bName = cleanStr(b.name);
+    return (bName.length >= 2 && cleanCell.includes(bName)) || (cleanCell.length >= 2 && bName.includes(cleanCell));
+  });
+  if (looseMatch) return { branch: looseMatch };
+  return {
+    error: `Xarunta "${rawCell}" lama helin. Xarumaha jira: ${branches.map(b => b.name).join(', ') || 'Ma jiraan'}`
+  };
+};
+
 const phoneVariants = (value) => {
   const d = digitsOnly(value);
   if (!d) return [];
@@ -274,6 +292,12 @@ const StudentsManagement = () => {
       return cached ? JSON.parse(cached) : [];
     } catch { return []; }
   });
+  const [branches, setBranches] = useState(() => {
+    try {
+      const cached = sessionStorage.getItem('cachedBranchesData');
+      return cached ? JSON.parse(cached) : [];
+    } catch { return []; }
+  });
   const [classes, setClasses] = useState(() => {
     try {
       const cached = sessionStorage.getItem('cachedClassesData');
@@ -289,6 +313,7 @@ const StudentsManagement = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingItem, setEditingItem] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [selectedBranch, setSelectedBranch] = useState('ALL');
   const [selectedClass, setSelectedClass] = useState('ALL');
   const [cycleFilter, setCycleFilter] = useState('ALL'); // 'ALL' | 'CURRENT' | specific cycleKey
   const [viewMode, setViewMode] = useState(() => {
@@ -332,6 +357,7 @@ const StudentsManagement = () => {
 
   const [formData, setFormData] = useState({
     fullName: '',
+    branchId: '',
     classId: '',
     gender: 'Male',
     monthlyFee: '',
@@ -352,17 +378,21 @@ const StudentsManagement = () => {
   const fetchData = async () => {
     try {
       if (!data.length) setLoading(true);
-      const [resStudents, resClasses, resGuardians] = await Promise.all([
+      const [resStudents, resBranches, resGuardians, resClasses] = await Promise.all([
         api.get('/students'),
-        api.get('/classes'),
-        api.get('/guardians')
+        api.get('/branches'),
+        api.get('/guardians'),
+        api.get('/classes')
       ]);
       const studentsList = resStudents.data || [];
+      const branchesList = resBranches.data || [];
       const classesList = resClasses.data || [];
       setData(studentsList);
+      setBranches(branchesList);
       setClasses(classesList);
       setGuardians(resGuardians.data || []);
       sessionStorage.setItem('cachedStudentsData', JSON.stringify(studentsList));
+      sessionStorage.setItem('cachedBranchesData', JSON.stringify(branchesList));
       sessionStorage.setItem('cachedClassesData', JSON.stringify(classesList));
     } catch (error) {
       console.error("Failed to fetch students data", error);
@@ -446,6 +476,7 @@ const StudentsManagement = () => {
       studentId: t('students.sheet.leaveBlank'),
       fullName: t('students.sheet.exampleName'),
       gender: valueLabel('gender', 'Male', language),
+      branchName: branches[0]?.name || t('students.sheet.exampleBranch') || 'Xarunta 1',
       guardianName: t('students.sheet.exampleGuardian') || 'Cali Xasan',
       guardianPhone: '0615551234',
       admissionReason: t('students.sheet.exampleReason') || 'Daryeel & Waxbarasho',
@@ -469,7 +500,7 @@ const StudentsManagement = () => {
 
   // ── Export ────────────────────────────────────────────────────────────────
   // Columns:
-  // student id, Magaca ardayda, Gender, Magaca Masuul, number masuulka,
+  // student id, Magaca ardayda, Gender, Xarunta, Magaca Masuul, number masuulka,
   // Sababta losoo xiray, Relationship, Lacagta Bisha, Xanuuna uuqabo
   const handleExport = async () => {
     const ExcelJS = await loadExcelJS();
@@ -480,10 +511,12 @@ const StudentsManagement = () => {
 
     data.forEach((item) => {
       const guardian = item.guardianId && typeof item.guardianId === 'object' ? item.guardianId : null;
+      const branchObj = item.branchId && typeof item.branchId === 'object' ? item.branchId : branches.find(b => b._id === item.branchId);
       sheet.addRow({
         studentId: item.studentCode || '',
         fullName: item.fullName || '',
         gender: item.gender ? valueLabel('gender', item.gender, language) : (item.gender || 'Male'),
+        branchName: branchObj?.name || '',
         guardianName: guardian?.fullName || item.fatherName || '',
         guardianPhone: guardian?.phone || item.fatherPhone || '',
         admissionReason: item.admissionReason || '',
@@ -535,7 +568,7 @@ const StudentsManagement = () => {
     return id;
   };
 
-  const importRow = async (row, existingKeys, cache) => {
+  const importRow = async (row, existingKeys, cache, branchesList = []) => {
     if (!row.fullName) throw new Error(t('students.import.fullNameRequired'));
 
     // Check duplicate by normalized name
@@ -547,10 +580,21 @@ const StudentsManagement = () => {
 
     const guardianId = await resolveGuardian(row, cache);
 
+    let branchId = undefined;
+    if (row.branchName) {
+      const { branch, error } = resolveBranchFromCell(row.branchName, branchesList);
+      if (error) throw new Error(error);
+      if (branch) branchId = branch._id;
+    }
+    if (!branchId && branchesList.length > 0) {
+      branchId = branchesList[0]._id;
+    }
+
     // Student ID is deliberately omitted: the server issues it automatically.
     await api.post('/students', {
       fullName: row.fullName,
       gender: toStoredValue('gender', row.gender) || 'Male',
+      branchId: branchId || undefined,
       monthlyFee: Number(row.monthlyFee) || 0,
       fee: Number(row.monthlyFee) || 0,
       fatherName: guardianName,
@@ -620,7 +664,7 @@ const StudentsManagement = () => {
       // rather than racing to create duplicates.
       for (const row of rows) {
         try {
-          await importRow(row, existingKeys, cache);
+          await importRow(row, existingKeys, cache, branches);
           results.push({ row: row.rowNumber, name: row.fullName, ok: true, message: t('students.import.imported') });
         } catch (error) {
           results.push({
@@ -700,6 +744,7 @@ const StudentsManagement = () => {
     if (docInputRef.current) docInputRef.current.value = '';
     setFormData({
       fullName: '',
+      branchId: branches[0]?._id || '',
       classId: '',
       gender: 'Male',
       monthlyFee: '',
@@ -726,6 +771,7 @@ const StudentsManagement = () => {
     setFoundGuardian(existingG);
     setFormData({
       fullName: item.fullName || '',
+      branchId: item.branchId?._id || item.branchId || branches[0]?._id || '',
       classId: item.classId?._id || item.classId || '',
       gender: item.gender || 'Male',
       monthlyFee: item.monthlyFee !== undefined ? item.monthlyFee : (item.fee || ''),
@@ -778,6 +824,7 @@ const StudentsManagement = () => {
 
       const payload = {
         fullName: formData.fullName,
+        branchId: formData.branchId || undefined,
         classId: formData.classId || undefined,
         gender: formData.gender,
         monthlyFee: Number(formData.monthlyFee) || 0,
@@ -869,9 +916,9 @@ const StudentsManagement = () => {
   };
 
   const filteredData = data.filter(item => {
-    if (selectedClass !== 'ALL') {
-      const itemClassId = String(item.classId?._id || item.classId || '');
-      if (itemClassId !== String(selectedClass)) {
+    if (selectedBranch !== 'ALL') {
+      const itemBranchId = String(item.branchId?._id || item.branchId || '');
+      if (itemBranchId !== String(selectedBranch)) {
         return false;
       }
     }
@@ -888,6 +935,7 @@ const StudentsManagement = () => {
     const term = searchTerm.toLowerCase();
     const gName = item.guardianId?.fullName || '';
     const gPhone = item.guardianId?.phone || '';
+    const branchName = item.branchId?.name || '';
     const className = classSearchText(item.classId);
     return (
       (item.fullName || '').toLowerCase().includes(term) ||
@@ -897,6 +945,7 @@ const StudentsManagement = () => {
       gName.toLowerCase().includes(term) ||
       gPhone.toLowerCase().includes(term) ||
       (item.guardianId?.alternatePhone || '').toLowerCase().includes(term) ||
+      branchName.toLowerCase().includes(term) ||
       className.toLowerCase().includes(term)
     );
   });
@@ -906,13 +955,13 @@ const StudentsManagement = () => {
   const filteredStudentsCount = filteredData.length;
   const totalMonthlyFee = filteredData.reduce((acc, curr) => acc + Number(curr.monthlyFee ?? curr.fee ?? 0), 0);
 
-  // Class student counts map for filter
-  const classCounts = React.useMemo(() => {
+  // Branch student counts map for filter
+  const branchCounts = React.useMemo(() => {
     const map = {};
     data.forEach(s => {
-      const cid = String(s.classId?._id || s.classId || '');
-      if (cid) {
-        map[cid] = (map[cid] || 0) + 1;
+      const bid = String(s.branchId?._id || s.branchId || '');
+      if (bid) {
+        map[bid] = (map[bid] || 0) + 1;
       }
     });
     return map;
@@ -1031,28 +1080,27 @@ const StudentsManagement = () => {
           )}
         </div>
 
-        {/* Class Filter - Compact */}
+        {/* Branch Filter - Compact */}
         <div className="flex items-center bg-white dark:bg-slate-900 rounded-2xl px-3 py-2.5 border border-slate-100 dark:border-slate-800 shadow-sm shrink-0">
-          <Filter size={15} className="text-emerald-500 mr-1.5 shrink-0" />
+          <Building2 size={15} className="text-emerald-500 mr-1.5 shrink-0" />
           <select
-            value={selectedClass}
-            onChange={(e) => setSelectedClass(e.target.value)}
+            value={selectedBranch}
+            onChange={(e) => setSelectedBranch(e.target.value)}
             className="bg-transparent outline-none text-xs sm:text-sm font-bold text-slate-800 dark:text-slate-200 cursor-pointer border-none p-0 focus:ring-0"
           >
-            <option value="ALL">All Classes ({data.length})</option>
-            {classes.map(c => {
-              const count = classCounts[String(c._id)] || 0;
-              const label = classLabel(c, c.name || c.className || t('common.class'));
+            <option value="ALL">{t('students.allBranchesCount', { count: data.length }) || `Dhammaan Xarumaha (${data.length})`}</option>
+            {branches.map(b => {
+              const count = branchCounts[String(b._id)] || 0;
               return (
-                <option key={c._id} value={c._id}>
-                  {label} ({count})
+                <option key={b._id} value={b._id}>
+                  {b.name} ({count})
                 </option>
               );
             })}
           </select>
-          {selectedClass !== 'ALL' && (
+          {selectedBranch !== 'ALL' && (
             <button 
-              onClick={() => setSelectedClass('ALL')}
+              onClick={() => setSelectedBranch('ALL')}
               title={t('students.resetFilter')}
               className="ml-1 text-slate-400 hover:text-rose-500 transition-colors"
             >
@@ -1214,10 +1262,10 @@ const StudentsManagement = () => {
                   <div className="space-y-2.5 my-3 pt-3 border-t border-slate-100 dark:border-slate-800/80">
                     <div className="flex items-center justify-between text-xs">
                       <span className="text-slate-400 font-semibold flex items-center gap-1.5">
-                        <BookOpen size={14} className="text-emerald-500" /> {t('common.class')}:
+                        <Building2 size={14} className="text-emerald-500" /> {t('students.colBranch')}:
                       </span>
                       <span className="font-extrabold text-slate-800 dark:text-slate-200 bg-slate-100 dark:bg-slate-800 px-2.5 py-1 rounded-xl truncate max-w-[150px]">
-                        {cls?.name || cls?.className || '-'}
+                        {item.branchId?.name || '-'}
                       </span>
                     </div>
 
@@ -1313,7 +1361,7 @@ const StudentsManagement = () => {
                 <tr className="bg-slate-50/70 dark:bg-slate-800/40 text-slate-400 text-[10px] font-black uppercase tracking-wider border-b border-slate-100 dark:border-slate-800">
                   <th className="px-4 py-4 whitespace-nowrap">{t('students.colFullName')}</th>
                   <th className="px-3 py-4 whitespace-nowrap">{t('students.colStudentId')}</th>
-                  <th className="px-3 py-4 whitespace-nowrap">{t('common.class')}</th>
+                  <th className="px-3 py-4 whitespace-nowrap">{t('students.colBranch')}</th>
                   <th className="px-3 py-4 whitespace-nowrap">{t('students.colFee')}</th>
                   <th className="px-4 py-4 whitespace-nowrap">{t('students.colWhoPays')}</th>
                   <th className="px-3 py-4 whitespace-nowrap">{t('students.colRegDate')}</th>
@@ -1323,7 +1371,6 @@ const StudentsManagement = () => {
               <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
                 {filteredData.map((item) => {
                   const guardian = item.guardianId && typeof item.guardianId === 'object' ? item.guardianId : null;
-                  const cls = item.classId && typeof item.classId === 'object' ? item.classId : classes.find(c => c._id === item.classId);
                   const studentFee = item.monthlyFee !== undefined ? item.monthlyFee : (item.fee || 0);
 
                   return (
@@ -1359,8 +1406,8 @@ const StudentsManagement = () => {
                         </span>
                       </td>
                       <td className="px-3 py-3.5 text-xs font-semibold text-slate-700 dark:text-slate-300">
-                        <span className="truncate block max-w-[140px]" title={cls?.name || cls?.className || '-'}>
-                          {cls?.name || cls?.className || '-'}
+                        <span className="truncate block max-w-[140px]" title={item.branchId?.name || '-'}>
+                          {item.branchId?.name || '-'}
                         </span>
                       </td>
                       <td className="px-3 py-3.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
@@ -1432,13 +1479,13 @@ const StudentsManagement = () => {
           </div>
           <h3 className="text-lg font-black text-slate-900 dark:text-white">{t('students.emptyTitle')}</h3>
           <p className="text-slate-400 text-sm mt-1 max-w-sm mx-auto">
-            {searchTerm || selectedClass !== 'ALL'
+            {searchTerm || selectedBranch !== 'ALL'
               ? t('students.emptyFiltered')
               : t('students.emptyNone')}
           </p>
-          {(searchTerm || selectedClass !== 'ALL') ? (
+          {(searchTerm || selectedBranch !== 'ALL') ? (
             <button
-              onClick={() => { setSearchTerm(''); setSelectedClass('ALL'); }}
+              onClick={() => { setSearchTerm(''); setSelectedBranch('ALL'); }}
               className="mt-5 px-6 py-2.5 bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold rounded-xl transition-all shadow-md shadow-brand-600/20"
             >
               {t('students.resetFilters')}
@@ -1485,7 +1532,7 @@ const StudentsManagement = () => {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                 <div>
                   <label className="block text-xs font-black uppercase text-slate-500 mb-1">{t('students.colStudentId')}</label>
                   {/* Issued by the server on save and never editable, so this is a
@@ -1493,6 +1540,19 @@ const StudentsManagement = () => {
                   <div className="w-full px-4 py-3 rounded-2xl bg-slate-100 dark:bg-slate-800/60 border border-slate-200 dark:border-slate-700 font-mono text-sm font-black text-brand-600 dark:text-brand-400">
                     {editingItem?.studentCode || t('students.assignedAutomatically')}
                   </div>
+                </div>
+                <div>
+                  <label className="block text-xs font-black uppercase text-slate-500 mb-1">{t('students.branchLabel') || 'Xarunta *'}</label>
+                  <select
+                    value={formData.branchId}
+                    onChange={(e) => setFormData({ ...formData, branchId: e.target.value })}
+                    className="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none text-slate-900 dark:text-white font-semibold"
+                  >
+                    <option value="">{t('students.branchPlaceholder') || 'Dooro Xarunta'}</option>
+                    {branches.map(b => (
+                      <option key={b._id} value={b._id}>{b.name}</option>
+                    ))}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-xs font-black uppercase text-slate-500 mb-1">{t('common.gender')}</label>
@@ -1794,7 +1854,7 @@ const StudentsManagement = () => {
         name={cardStudent?.fullName}
         idNumber={cardStudent?.studentCode}
         rows={[
-          { label: t('common.class'), value: classLabel(cardStudent?.classId, '') },
+          { label: t('students.colBranch') || 'Xarunta', value: cardStudent?.branchId?.name || '' },
           { label: t('common.guardian'), value: cardStudent?.guardianId?.fullName || cardStudent?.fatherName || '' }
         ]}
       />
@@ -1826,9 +1886,9 @@ const StudentsManagement = () => {
               {/* Basic Info Grid */}
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60">
-                  <span className="text-slate-400 font-bold uppercase text-[10px] block">{t('common.class')}</span>
+                  <span className="text-slate-400 font-bold uppercase text-[10px] block">{t('students.colBranch') || 'Xarunta'}</span>
                   <span className="font-bold text-slate-800 dark:text-slate-200 text-sm">
-                    {classLabel(viewingStudent.classId, viewingStudent.classId?.name || '—')}
+                    {viewingStudent.branchId?.name || '—'}
                   </span>
                 </div>
                 <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60">

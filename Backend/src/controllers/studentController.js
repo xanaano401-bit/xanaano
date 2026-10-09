@@ -9,21 +9,29 @@ const getStudents = asyncHandler(async (req, res) => {
     //   ?status=Exited   → only exited students (Exit Students page).
     //   ?status=All      → everyone, exited included.
     //   ?status=<value>  → that exact status.
-    const { status } = req.query;
+    const { status, branchId } = req.query;
     let filter;
     if (status === 'All') filter = {};
     else if (status) filter = { status };
     else filter = { status: { $ne: 'Exited' } };
 
+    if (branchId && branchId !== 'ALL') {
+        filter.branchId = branchId;
+    }
+
     const data = await Student.find(filter)
         .populate('guardianId')
+        .populate('branchId', 'name address phone')
         .populate({ path: 'classId', populate: { path: 'branchId', select: 'name' } })
         .lean();
     res.json(data);
 });
 
 const getStudentById = asyncHandler(async (req, res) => {
-    const data = await Student.findById(req.params.id).populate('guardianId').populate({ path: 'classId', populate: { path: 'branchId', select: 'name' } });
+    const data = await Student.findById(req.params.id)
+        .populate('guardianId')
+        .populate('branchId', 'name address phone')
+        .populate({ path: 'classId', populate: { path: 'branchId', select: 'name' } });
     if (data) {
         res.json(data);
     } else {
@@ -45,23 +53,27 @@ const createStudent = asyncHandler(async (req, res) => {
         delete payload.classId;
     }
 
-    // Duplicate check: Prevent registering the same student multiple times in the same class/branch
+    if (!payload.branchId && req.user?.branchId) {
+        payload.branchId = req.user.branchId;
+    }
+
+    // Duplicate check: Prevent registering the same student multiple times in the same branch
     const escapedName = trimmedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const duplicateQuery = {
         fullName: { $regex: new RegExp(`^${escapedName}$`, 'i') },
         status: { $ne: 'Exited' }
     };
-    if (payload.classId) {
-        duplicateQuery.classId = payload.classId;
-    } else if (payload.branchId) {
+    if (payload.branchId) {
         duplicateQuery.branchId = payload.branchId;
     }
 
-    const existingStudent = await Student.findOne(duplicateQuery).populate('classId', 'name className');
+    const existingStudent = await Student.findOne(duplicateQuery)
+        .populate('branchId', 'name')
+        .populate('classId', 'name className');
     if (existingStudent) {
-        const clsName = existingStudent.classId?.name || existingStudent.classId?.className || 'nidaamka';
+        const placeName = existingStudent.branchId?.name ? `xarunta "${existingStudent.branchId.name}"` : 'nidaamka';
         res.status(400);
-        throw new Error(`Ardaygan "${trimmedName}" horey ayuu ugu jiraa ${clsName} (#${existingStudent.studentCode || ''})! Laguma celin karo laba jeer.`);
+        throw new Error(`Ardaygan "${trimmedName}" horey ayuu ugu jiraa ${placeName} (#${existingStudent.studentCode || ''})! Laguma celin karo laba jeer.`);
     }
 
     // The student ID is issued by the system, never accepted from the client and
@@ -75,10 +87,6 @@ const createStudent = asyncHandler(async (req, res) => {
         async (code) => Boolean(await Student.exists({ studentCode: code })),
         200
     );
-
-    if (!payload.branchId && req.user?.branchId) {
-        payload.branchId = req.user.branchId;
-    }
 
     if (payload.fee !== undefined && payload.monthlyFee === undefined) {
         payload.monthlyFee = Number(payload.fee) || 0;
@@ -96,7 +104,10 @@ const createStudent = asyncHandler(async (req, res) => {
     }
 
     const data = await Student.create(payload);
-    const populated = await Student.findById(data._id).populate('guardianId').populate({ path: 'classId', populate: { path: 'branchId', select: 'name' } });
+    const populated = await Student.findById(data._id)
+        .populate('guardianId')
+        .populate('branchId', 'name address phone')
+        .populate({ path: 'classId', populate: { path: 'branchId', select: 'name' } });
     res.status(201).json(populated || data);
 });
 
@@ -113,10 +124,10 @@ const updateStudent = asyncHandler(async (req, res) => {
         delete payload.classId;
     }
 
-    // Check duplicate if name or class changed
-    if (payload.fullName || payload.classId !== undefined) {
+    // Check duplicate if name or branch changed
+    if (payload.fullName || payload.branchId !== undefined) {
         const targetName = (payload.fullName || existing.fullName || '').trim();
-        const targetClass = payload.classId !== undefined ? payload.classId : existing.classId;
+        const targetBranch = payload.branchId !== undefined ? payload.branchId : existing.branchId;
         const escapedName = targetName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
         const duplicateQuery = {
@@ -124,16 +135,18 @@ const updateStudent = asyncHandler(async (req, res) => {
             fullName: { $regex: new RegExp(`^${escapedName}$`, 'i') },
             status: { $ne: 'Exited' }
         };
-        if (targetClass) {
-            duplicateQuery.classId = targetClass;
+        if (targetBranch) {
+            duplicateQuery.branchId = targetBranch;
         }
 
-        const duplicateCheck = await Student.findOne(duplicateQuery).populate('classId', 'name className');
+        const duplicateCheck = await Student.findOne(duplicateQuery)
+            .populate('branchId', 'name')
+            .populate('classId', 'name className');
 
         if (duplicateCheck) {
-            const clsName = duplicateCheck.classId?.name || duplicateCheck.classId?.className || 'nidaamka';
+            const placeName = duplicateCheck.branchId?.name ? `xarunta "${duplicateCheck.branchId.name}"` : 'nidaamka';
             res.status(400);
-            throw new Error(`Arday magacan "${targetName}" leh horey ayuu ugu jiraa ${clsName}!`);
+            throw new Error(`Arday magacan "${targetName}" leh horey ayuu ugu jiraa ${placeName}!`);
         }
     }
 
@@ -203,7 +216,10 @@ const updateStudent = asyncHandler(async (req, res) => {
         }
     }
 
-    const data = await Student.findByIdAndUpdate(req.params.id, payload, { new: true }).populate('guardianId').populate({ path: 'classId', populate: { path: 'branchId', select: 'name' } });
+    const data = await Student.findByIdAndUpdate(req.params.id, payload, { new: true })
+        .populate('guardianId')
+        .populate('branchId', 'name address phone')
+        .populate({ path: 'classId', populate: { path: 'branchId', select: 'name' } });
     if (data) {
         res.json(data);
     } else {
