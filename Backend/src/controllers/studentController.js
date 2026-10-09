@@ -41,6 +41,10 @@ const createStudent = asyncHandler(async (req, res) => {
         throw new Error('Fadlan geli magaca buuxa ee ardayga');
     }
 
+    if (!payload.classId) {
+        delete payload.classId;
+    }
+
     // Duplicate check: Prevent registering the same student multiple times in the same class/branch
     const escapedName = trimmedName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
     const duplicateQuery = {
@@ -55,7 +59,7 @@ const createStudent = asyncHandler(async (req, res) => {
 
     const existingStudent = await Student.findOne(duplicateQuery).populate('classId', 'name className');
     if (existingStudent) {
-        const clsName = existingStudent.classId?.name || existingStudent.classId?.className || 'fasalkan';
+        const clsName = existingStudent.classId?.name || existingStudent.classId?.className || 'nidaamka';
         res.status(400);
         throw new Error(`Ardaygan "${trimmedName}" horey ayuu ugu jiraa ${clsName} (#${existingStudent.studentCode || ''})! Laguma celin karo laba jeer.`);
     }
@@ -105,21 +109,29 @@ const updateStudent = asyncHandler(async (req, res) => {
         throw new Error('Student not found');
     }
 
+    if (!payload.classId && payload.classId !== undefined) {
+        delete payload.classId;
+    }
+
     // Check duplicate if name or class changed
-    if (payload.fullName || payload.classId) {
+    if (payload.fullName || payload.classId !== undefined) {
         const targetName = (payload.fullName || existing.fullName || '').trim();
-        const targetClass = payload.classId || existing.classId;
+        const targetClass = payload.classId !== undefined ? payload.classId : existing.classId;
         const escapedName = targetName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-        const duplicateCheck = await Student.findOne({
+        const duplicateQuery = {
             _id: { $ne: existing._id },
             fullName: { $regex: new RegExp(`^${escapedName}$`, 'i') },
-            classId: targetClass,
             status: { $ne: 'Exited' }
-        }).populate('classId', 'name className');
+        };
+        if (targetClass) {
+            duplicateQuery.classId = targetClass;
+        }
+
+        const duplicateCheck = await Student.findOne(duplicateQuery).populate('classId', 'name className');
 
         if (duplicateCheck) {
-            const clsName = duplicateCheck.classId?.name || duplicateCheck.classId?.className || 'fasalkan';
+            const clsName = duplicateCheck.classId?.name || duplicateCheck.classId?.className || 'nidaamka';
             res.status(400);
             throw new Error(`Arday magacan "${targetName}" leh horey ayuu ugu jiraa ${clsName}!`);
         }

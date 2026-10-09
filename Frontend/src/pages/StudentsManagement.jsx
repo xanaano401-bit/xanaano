@@ -705,7 +705,7 @@ const StudentsManagement = () => {
     if (docInputRef.current) docInputRef.current.value = '';
     setFormData({
       fullName: '',
-      classId: classes[0]?._id || '',
+      classId: '',
       gender: 'Male',
       monthlyFee: '',
       feeScope: 'current',
@@ -783,7 +783,7 @@ const StudentsManagement = () => {
 
       const payload = {
         fullName: formData.fullName,
-        classId: formData.classId,
+        classId: formData.classId || undefined,
         gender: formData.gender,
         monthlyFee: Number(formData.monthlyFee) || 0,
         fee: Number(formData.monthlyFee) || 0,
@@ -1500,22 +1500,6 @@ const StudentsManagement = () => {
                   </div>
                 </div>
                 <div>
-                  <label className="block text-xs font-black uppercase text-slate-500 mb-1">{t('common.class')}</label>
-                  <select
-                    value={formData.classId}
-                    onChange={(e) => setFormData({ ...formData, classId: e.target.value })}
-                    className="w-full px-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none text-slate-900 dark:text-white"
-                  >
-                    <option value="">{t('common.selectClass')}</option>
-                    {classes.map(c => (
-                      <option key={c._id} value={c._id}>{classLabel(c)}</option>
-                    ))}
-                  </select>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div>
                   <label className="block text-xs font-black uppercase text-slate-500 mb-1">{t('common.gender')}</label>
                   <select
                     value={formData.gender}
@@ -1526,6 +1510,9 @@ const StudentsManagement = () => {
                     <option value="Female">{tv('Female')}</option>
                   </select>
                 </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-black uppercase text-slate-500 mb-1">{t('students.colRegDate')}</label>
                   <input
