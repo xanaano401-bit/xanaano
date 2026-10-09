@@ -3,7 +3,7 @@
 # Secrets (sync:false) are NOT stored here — you set them in the Render dashboard.
 services:
   - type: web
-    name: mach-backend
+    name: xanaano-backend
     runtime: node
     rootDir: Backend
     plan: free
