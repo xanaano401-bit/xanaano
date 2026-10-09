@@ -17,28 +17,43 @@ import { currentCycle, cycleKeyForDate, cycleShortLabel, cycleLabel, addCycles }
 // exported for reference but never imported — the server issues it (1001, 1002…)
 // and ignores any value sent by a client.
 const SHEET_COLUMNS = [
-  { header: 'Student ID', key: 'studentId', width: 12 },
-  { header: 'Full Name', key: 'fullName', width: 26 },
-  { header: 'Class', key: 'className', width: 18 },
-  { header: 'Gender', key: 'gender', width: 10 },
-  { header: 'Monthly Fee', key: 'monthlyFee', width: 13 },
-  { header: 'Father Name', key: 'fatherName', width: 22 },
-  { header: 'Father Phone', key: 'fatherPhone', width: 16 },
-  { header: 'Fee Payer Name', key: 'payerName', width: 22 },
-  { header: 'Fee Payer Phone', key: 'payerPhone', width: 18 },
-  { header: 'Fee Payer Alt Phone', key: 'payerAltPhone', width: 18 },
-  { header: 'Relationship', key: 'relationship', width: 14 },
-  { header: 'Status', key: 'status', width: 12 }
+  { header: 'Student ID', key: 'studentId', width: 14 },
+  { header: 'Magaca Ardayda', key: 'fullName', width: 28 },
+  { header: 'Magaca Masuul', key: 'guardianName', width: 24 },
+  { header: 'Number Masuulka', key: 'guardianPhone', width: 18 },
+  { header: 'Sababta Loosoo Xiray', key: 'admissionReason', width: 26 },
+  { header: 'Relationship', key: 'relationship', width: 16 },
+  { header: 'Lacagta Bisha', key: 'monthlyFee', width: 15 },
+  { header: 'Xanuunada Uu Qabo', key: 'healthConditions', width: 26 }
 ];
 
 const SHEET_NAME = 'Students';
 
-// Column headers in the selected language. Import accepts the English and the
-// Somali header for every column, so a file exported in either language (or an
-// older English template) can always be imported.
-const localizedColumns = () => SHEET_COLUMNS.map(c => ({ ...c, header: translate(`students.sheet.${c.key}`) }));
-const headerAliases = (column) => [column.header, translate(`students.sheet.${column.key}`, undefined, 'en'), translate(`students.sheet.${column.key}`, undefined, 'so')]
-  .map(h => String(h).toLowerCase());
+const COLUMN_ALIASES = {
+  studentId: ['student id', 'aqoonsiga ardayga', 'id'],
+  fullName: ['magaca ardayda', 'magaca ardayga', 'magaca oo buuxa', 'full name', 'student name', 'name'],
+  guardianName: ['magaca masuul', 'magaca masuulka', 'magaca bixiyaha', 'fee payer name', 'payer name', 'guardian name', 'parent name', 'father name', 'magaca aabbaha'],
+  guardianPhone: ['number masuulka', 'mnumber masuulka', 'lambar masuul', 'lambarka masuulka', 'telefoonka masuulka', 'telefoonka bixiyaha', 'guardian phone', 'fee payer phone', 'phone', 'payer phone', 'father phone', 'telefoonka aabbaha'],
+  admissionReason: ['sababta losoo xiray', 'sababta loosoo xiray', 'sababta loosoo xiray / loo keenay', 'sababta', 'admission reason', 'reason'],
+  relationship: ['relationship', 'xiriirka', 'xiriirka masuulka'],
+  monthlyFee: ['lacagta bisha', 'khidmadda bishii', 'khidmadda', 'monthly fee', 'fee'],
+  healthConditions: ['xanuuna uuqabo', 'xanuunada uu qabo', 'xanuunada uu qabo / xaaladda caafimaad', 'xanuunada', 'health conditions', 'health']
+};
+
+const localizedColumns = () => SHEET_COLUMNS.map(c => ({
+  ...c,
+  header: translate(`students.sheet.${c.key}`) || c.header
+}));
+
+const headerAliases = (column) => {
+  const dynamic = [
+    column.header,
+    translate(`students.sheet.${column.key}`, undefined, 'en'),
+    translate(`students.sheet.${column.key}`, undefined, 'so')
+  ];
+  const extras = COLUMN_ALIASES[column.key] || [];
+  return [...dynamic, ...extras].map(h => String(h || '').toLowerCase().trim());
+};
 
 // Stored values written into a sheet in Somali are mapped back to the stored
 // English value on import, so the database only ever receives valid values.
@@ -428,16 +443,12 @@ const StudentsManagement = () => {
     sheet.addRow({
       studentId: t('students.sheet.leaveBlank'),
       fullName: t('students.sheet.exampleName'),
-      className: classes[0] ? classLabel(classes[0]) : 'Tamhiid 3 (FR1)',
-      gender: valueLabel('gender', 'Male', language),
-      monthlyFee: 20,
-      fatherName: t('students.sheet.exampleFather'),
-      fatherPhone: '0615551234',
-      payerName: t('students.sheet.exampleFather'),
-      payerPhone: '0615551234',
-      payerAltPhone: '',
+      guardianName: t('students.sheet.exampleGuardian') || 'Cali Xasan',
+      guardianPhone: '0615551234',
+      admissionReason: t('students.sheet.exampleReason') || 'Daryeel & Waxbarasho',
       relationship: valueLabel('relationship', 'Father', language),
-      status: valueLabel('status', 'Active', language)
+      monthlyFee: 20,
+      healthConditions: t('students.sheet.exampleHealth') || 'Ma jiro'
     });
     sheet.getRow(2).font = { italic: true, color: { argb: 'FF94A3B8' } };
 
@@ -445,9 +456,8 @@ const StudentsManagement = () => {
     notes.columns = [{ width: 96 }];
     [
       ...t('students.sheet.instructionsTop'),
-      t('students.sheet.existingClasses', { classes: classes.map(c => classLabel(c)).filter(Boolean).join(', ') || t('students.sheet.noneYet') }),
       ...t('students.sheet.instructionsBottom')
-    ].forEach(line => notes.addRow([line]));
+    ].filter(Boolean).forEach(line => notes.addRow([line]));
     notes.getRow(1).font = { bold: true, size: 13 };
 
     await downloadWorkbook(workbook, t('students.sheet.templateFile'));
@@ -455,8 +465,9 @@ const StudentsManagement = () => {
   };
 
   // ── Export ────────────────────────────────────────────────────────────────
-  // One row per student using the registration fields plus the payer resolved
-  // through guardianId. The file can be re-imported as-is.
+  // Exactly the 8 requested columns:
+  // student id, Magaca ardayda, Magaca Masuul, number masuulka,
+  // Sababta losoo xiray, Relationship, Lacagta Bisha, Xanuuna uuqabo
   const handleExport = async () => {
     const ExcelJS = await loadExcelJS();
     const workbook = new ExcelJS.Workbook();
@@ -465,27 +476,22 @@ const StudentsManagement = () => {
     styleHeaderRow(sheet);
 
     data.forEach((item) => {
-      const cls = classes.find(c => String(c._id) === String(item.classId?._id || item.classId));
       const guardian = item.guardianId && typeof item.guardianId === 'object' ? item.guardianId : null;
       sheet.addRow({
         studentId: item.studentCode || '',
         fullName: item.fullName || '',
-        className: cls ? classLabel(cls, '') : '',
-        gender: item.gender ? valueLabel('gender', item.gender, language) : '',
+        guardianName: guardian?.fullName || item.fatherName || '',
+        guardianPhone: guardian?.phone || item.fatherPhone || '',
+        admissionReason: item.admissionReason || '',
+        relationship: guardian?.relationship ? valueLabel('relationship', guardian.relationship, language) : (guardian?.relationship || 'Father'),
         monthlyFee: Number(item.monthlyFee ?? item.fee ?? 0),
-        fatherName: item.fatherName || '',
-        // Phones are written as text so a leading zero is never dropped.
-        fatherPhone: item.fatherPhone || '',
-        payerName: guardian?.fullName || '',
-        payerPhone: guardian?.phone || '',
-        payerAltPhone: guardian?.alternatePhone || '',
-        relationship: guardian?.relationship ? valueLabel('relationship', guardian.relationship, language) : '',
-        status: valueLabel('status', item.status || 'Active', language)
+        healthConditions: item.healthConditions || ''
       });
     });
 
-    ['fatherPhone', 'payerPhone', 'payerAltPhone'].forEach(key => {
-      sheet.getColumn(key).numFmt = '@';
+    ['guardianPhone'].forEach(key => {
+      const col = sheet.getColumn(key);
+      if (col) col.numFmt = '@';
     });
 
     await downloadWorkbook(workbook, `${t('students.sheet.exportFile')}_${new Date().toISOString().slice(0, 10)}.xlsx`);
@@ -497,12 +503,10 @@ const StudentsManagement = () => {
   };
 
   // ── Import ────────────────────────────────────────────────────────────────
-  // Resolve the payer by phone exactly as registration does: find an existing
-  // record first, reuse it when found, create one only when needed. An existing
-  // payer is never updated — that would rewrite the name for every student
-  // already attached to them.
+  // Resolve the payer by phone: find an existing record first, reuse it when found,
+  // create one only when needed.
   const resolveGuardian = async (row, cache) => {
-    const phone = row.payerPhone;
+    const phone = row.guardianPhone || row.payerPhone;
     if (!phone) return null;
 
     const variants = phoneVariants(phone);
@@ -518,9 +522,8 @@ const StudentsManagement = () => {
     }
 
     const { data: created } = await api.post('/guardians', {
-      fullName: row.payerName || row.fatherName || 'Fee Payer',
+      fullName: row.guardianName || row.payerName || row.fatherName || 'Fee Payer',
       phone,
-      alternatePhone: row.payerAltPhone || '',
       relationship: toStoredValue('relationship', row.relationship) || 'Father'
     });
     const id = created?._id || created?.id || null;
@@ -528,45 +531,33 @@ const StudentsManagement = () => {
     return id;
   };
 
-  // A student is treated as already present when the same name sits in the same class.
-  // This prevents duplicates even if the phone has a typo, extra digit, or was left blank.
-  const studentKey = (name, classId) =>
-    `${String(name).trim().toLowerCase()}|${String(classId)}`;
-
   const importRow = async (row, existingKeys, cache) => {
     if (!row.fullName) throw new Error(t('students.import.fullNameRequired'));
 
-    // Matched on class name AND branch together, so "Tamhiid 3 (FR1)" and
-    // "Tamhiid 3 (FR2)" land on their own class rather than whichever was
-    // created first.
-    const { cls, error: classError } = resolveClassFromCell(row.className, classes);
-    if (classError) throw new Error(classError);
+    // Check duplicate by normalized name
+    const normalizedName = String(row.fullName).trim().toLowerCase();
+    if (existingKeys.has(normalizedName)) throw new Error(t('students.import.alreadyRegistered'));
 
-    // Father name and phone are optional here, exactly as on the registration
-    // form: each falls back to the fee payer's details before being stored.
-    const fatherName = row.fatherName || row.payerName || '';
-    const fatherPhone = row.fatherPhone || row.payerPhone || '';
-
-    // Check duplicate by normalized name and class
-    const key = studentKey(row.fullName, cls._id);
-    if (existingKeys.has(key)) throw new Error(t('students.import.alreadyRegistered'));
+    const guardianName = row.guardianName || row.payerName || row.fatherName || '';
+    const guardianPhone = row.guardianPhone || row.payerPhone || row.fatherPhone || '';
 
     const guardianId = await resolveGuardian(row, cache);
 
-    // Student ID is deliberately omitted: the server issues it.
+    // Student ID is deliberately omitted: the server issues it automatically.
     await api.post('/students', {
       fullName: row.fullName,
-      classId: cls._id,
       gender: toStoredValue('gender', row.gender) || 'Male',
       monthlyFee: Number(row.monthlyFee) || 0,
       fee: Number(row.monthlyFee) || 0,
-      fatherName,
-      fatherPhone,
+      fatherName: guardianName,
+      fatherPhone: guardianPhone,
       guardianId: guardianId || undefined,
-      status: toStoredValue('status', row.status) || 'Active'
+      admissionReason: row.admissionReason || '',
+      healthConditions: row.healthConditions || '',
+      status: 'Active'
     });
 
-    existingKeys.add(key);
+    existingKeys.add(normalizedName);
   };
 
   const handleImportFile = async (event) => {
@@ -605,7 +596,7 @@ const StudentsManagement = () => {
           row[key] = col ? cellText(excelRow.getCell(col).value) : '';
         });
         // Skip the template's grey example row and any blank line.
-        if (!row.fullName || [translate('students.sheet.leaveBlank', undefined, 'en'), translate('students.sheet.leaveBlank', undefined, 'so')].includes(row.studentId)) return;
+        if (!row.fullName || [translate('students.sheet.leaveBlank', undefined, 'en'), translate('students.sheet.leaveBlank', undefined, 'so'), '(leave blank)', '(ka tag madhan)'].includes(row.studentId)) return;
         rows.push({ ...row, rowNumber });
       });
 
@@ -616,7 +607,7 @@ const StudentsManagement = () => {
       }
 
       const existingKeys = new Set(
-        data.map(s => studentKey(s.fullName, s.classId?._id || s.classId))
+        data.map(s => String(s.fullName || '').trim().toLowerCase())
       );
       const cache = new Map();
       const results = [];

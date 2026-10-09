@@ -24,12 +24,14 @@ const studentSchema = new mongoose.Schema({
     },
     fatherName: {
         type: String,
-        required: true,
+        required: false,
+        default: '',
         trim: true
     },
     fatherPhone: {
         type: String,
-        required: true,
+        required: false,
+        default: '',
         trim: true
     },
     guardianId: {

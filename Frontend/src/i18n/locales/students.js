@@ -66,37 +66,26 @@ export default {
     },
     sheet: {
       sheetName: 'Students', instructionsName: 'Instructions', templateFile: 'Student_Import_Template.xlsx', exportFile: 'Students',
-      leaveBlank: '(leave blank)', exampleName: 'Ahmed Ali', exampleFather: 'Ali Hassan', noneYet: '(none yet)',
-      studentId: 'Student ID', fullName: 'Full Name', className: 'Class', gender: 'Gender', monthlyFee: 'Monthly Fee',
-      fatherName: 'Father Name', fatherPhone: 'Father Phone', payerName: 'Fee Payer Name', payerPhone: 'Fee Payer Phone',
-      payerAltPhone: 'Fee Payer Alt Phone', relationship: 'Relationship', status: 'Status',
+      leaveBlank: '(leave blank)', exampleName: 'Ahmed Ali', exampleGuardian: 'Ali Hassan', noneYet: '(none yet)',
+      studentId: 'Student ID', fullName: 'Student Name', guardianName: 'Guardian Name', guardianPhone: 'Guardian Phone',
+      admissionReason: 'Admission Reason', relationship: 'Relationship', monthlyFee: 'Monthly Fee', healthConditions: 'Health Conditions',
+      exampleReason: 'Daycare & Learning', exampleHealth: 'None',
       instructionsTop: [
         'HOW TO USE THIS TEMPLATE',
         '',
         'One row = one student. Delete the grey example row before uploading.',
         '',
-        'Student ID  — leave blank. The system issues it automatically (1001, 1002, …).',
-        '              Any value typed here is ignored.',
-        'Full Name   — required.',
-        'Class       — required. Write either "Class Name" or "Class Name (Branch)", e.g. Tamhiid 3 or Tamhiid 3 (FR1).',
-        '              If multiple branches have a class with the same name, specify the branch.'
+        'Student ID         — leave blank. The system issues it automatically (1001, 1002, …).',
+        'Student Name       — required.',
+        'Guardian Name      — guardian / payer name.',
+        'Guardian Phone     — guardian / payer mobile phone number.',
+        'Admission Reason   — reason for admission / daycare.',
+        'Relationship       — Father, Mother, Guardian, etc. Defaults to Father.',
+        'Monthly Fee        — monthly tuition fee number (e.g. 20). Defaults to 0.',
+        'Health Conditions  — any medical notes, allergies, or illnesses.'
       ],
-      existingClasses: '              Existing classes: {classes}',
-      instructionsBottom: [
-        'Gender      — Male, Female or Other. Defaults to Male.',
-        'Monthly Fee — number. Defaults to 0.',
-        'Father Name / Father Phone — both required.',
-        '',
-        'Fee Payer Phone — this is how a payer is identified.',
-        '  · If the number already exists, the student is linked to that payer.',
-        '  · If not, a new payer is created once and reused for later rows.',
-        '  · Leaving it blank creates a student with no payer.',
-        '',
-        'Fee Payer Name / Alt Phone / Relationship — used only when creating a new payer.',
-        'An existing payer is never renamed, because that name is shared by all their students.',
-        '',
-        'Status — Active, Inactive or Graduated. Defaults to Active.'
-      ]
+      existingClasses: '',
+      instructionsBottom: []
     }
   },
   so: {
@@ -165,37 +154,26 @@ export default {
     },
     sheet: {
       sheetName: 'Ardayda', instructionsName: 'Tilmaamaha', templateFile: 'Qaabka_Soo_Gelinta_Ardayda.xlsx', exportFile: 'Ardayda',
-      leaveBlank: '(ka tag madhan)', exampleName: 'Axmed Cali', exampleFather: 'Cali Xasan', noneYet: '(weli ma jiraan)',
-      studentId: 'Aqoonsiga Ardayga', fullName: 'Magaca oo Buuxa', className: 'Fasalka', gender: 'Jinsiga', monthlyFee: 'Khidmadda Bishii',
-      fatherName: 'Magaca Aabbaha', fatherPhone: 'Telefoonka Aabbaha', payerName: 'Magaca Bixiyaha', payerPhone: 'Telefoonka Bixiyaha',
-      payerAltPhone: 'Telefoonka Labaad ee Bixiyaha', relationship: 'Xiriirka', status: 'Xaaladda',
+      leaveBlank: '(ka tag madhan)', exampleName: 'Axmed Cali', exampleGuardian: 'Cali Xasan', noneYet: '(weli ma jiraan)',
+      studentId: 'Student ID', fullName: 'Magaca Ardayda', guardianName: 'Magaca Masuul', guardianPhone: 'Number Masuulka',
+      admissionReason: 'Sababta Loosoo Xiray', relationship: 'Relationship', monthlyFee: 'Lacagta Bisha', healthConditions: 'Xanuunada Uu Qabo',
+      exampleReason: 'Daryeel & Waxbarasho', exampleHealth: 'Ma jiro',
       instructionsTop: [
         'SIDA LOO ISTICMAALO QAABKAN',
         '',
         'Hal saf = hal arday. Tirtir safka tusaalaha ah ee cawlan ka hor intaadan soo gelin.',
         '',
-        'Aqoonsiga Ardayga — ka tag madhan. Nidaamka ayaa si toos ah u bixiya (1001, 1002, …).',
-        '              Qiime kasta oo halkan lagu qoro waa la iska indha-tiraa.',
-        'Magaca oo Buuxa — qasab.',
-        'Fasalka — qasab. Qor "Magaca Fasalka" ama "Magaca Fasalka (Laanta)", tusaale Tamhiid 3 ama Tamhiid 3 (FR1).',
-        '              Haddii dhowr laamood ay leeyihiin fasal isku magac ah, sheeg laanta.'
+        'Student ID        — ka tag madhan. Nidaamka ayaa si toos ah u bixinaya (1001, 1002, …).',
+        'Magaca Ardayda    — qasab (magaca ardayga oo buuxa).',
+        'Magaca Masuul     — magaca qofka masuulka ka ah ama bixiyaha.',
+        'Number Masuulka   — lambarka telefoonka ee masuulka / bixiyaha.',
+        'Sababta Loosoo Xiray — sababta ilmaha loo keenay / loosoo xiray.',
+        'Relationship      — Father (Aabbe), Mother (Hooyo), Guardian (Masuul), iwm.',
+        'Lacagta Bisha     — tirada khidmadda bishii (tusaale: 20).',
+        'Xanuunada Uu Qabo — xogta caafimaadka, xasaasiyad ama xanuun joogto ah.'
       ],
-      existingClasses: '              Fasallada jira: {classes}',
-      instructionsBottom: [
-        'Jinsiga — Lab, Dhedig ama Kale. Caadi ahaan waa Lab.',
-        'Khidmadda Bishii — tiro. Caadi ahaan waa 0.',
-        'Magaca Aabbaha / Telefoonka Aabbaha — labaduba waa qasab.',
-        '',
-        'Telefoonka Bixiyaha — kani waa sida bixiyaha loo aqoonsado.',
-        '  · Haddii lambarku horey u jiro, ardayga waxaa lagu xiraa bixiyahaas.',
-        '  · Haddii kale, bixiye cusub ayaa hal mar la sameeyaa, safafka dambena waa loo isticmaalaa.',
-        '  · Haddii la dhaafo, arday aan bixiye lahayn ayaa la sameeyaa.',
-        '',
-        'Magaca Bixiyaha / Telefoonka Labaad / Xiriirka — waxaa la isticmaalaa kaliya marka bixiye cusub la sameynayo.',
-        'Bixiye jira magaciisa weligii lama beddelo, maxaa yeelay magacaas waxaa wadaaga dhammaan ardaydiisa.',
-        '',
-        'Xaaladda — Firfircoon, Aan firfircooneyn ama Qalin-jebiyey. Caadi ahaan waa Firfircoon.'
-      ]
+      existingClasses: '',
+      instructionsBottom: []
     }
   }
 };
