@@ -26,6 +26,7 @@ const SHEET_COLUMNS = [
   { header: 'Sababta Loosoo Xiray', key: 'admissionReason', width: 26 },
   { header: 'Relationship', key: 'relationship', width: 16 },
   { header: 'Lacagta Bisha', key: 'monthlyFee', width: 15 },
+  { header: 'Adeegga Ardayga', key: 'serviceFee', width: 18 },
   { header: 'Xanuunada Uu Qabo', key: 'healthConditions', width: 26 }
 ];
 
@@ -40,7 +41,8 @@ const COLUMN_ALIASES = {
   guardianPhone: ['number masuulka', 'mnumber masuulka', 'lambar masuul', 'lambarka masuulka', 'telefoonka masuulka', 'telefoonka bixiyaha', 'guardian phone', 'fee payer phone', 'phone', 'payer phone', 'father phone', 'telefoonka aabbaha'],
   admissionReason: ['sababta losoo xiray', 'sababta loosoo xiray', 'sababta loosoo xiray / loo keenay', 'sababta', 'admission reason', 'reason'],
   relationship: ['relationship', 'xiriirka', 'xiriirka masuulka'],
-  monthlyFee: ['lacagta bisha', 'khidmadda bishii', 'khidmadda', 'monthly fee', 'fee'],
+  monthlyFee: ['lacagta bisha', 'khidmadda bishii', 'khidmadda', 'monthly fee', 'fee', 'tuition fee'],
+  serviceFee: ['adeegga ardayga', 'adeegga', 'adeega', 'lacagta adeegga', 'lacagta adeegga ardayga', 'student services fee', 'service fee', 'services fee', 'student service fee', 'adeeg'],
   healthConditions: ['xanuuna uuqabo', 'xanuunada uu qabo', 'xanuunada uu qabo / xaaladda caafimaad', 'xanuunada', 'health conditions', 'health']
 };
 
@@ -483,7 +485,8 @@ const StudentsManagement = () => {
       guardianPhone: '0615551234',
       admissionReason: t('students.sheet.exampleReason') || 'Daryeel & Waxbarasho',
       relationship: valueLabel('relationship', 'Father', language),
-      monthlyFee: 20,
+      monthlyFee: 100,
+      serviceFee: 40,
       healthConditions: t('students.sheet.exampleHealth') || 'Ma jiro'
     });
     sheet.getRow(2).font = { italic: true, color: { argb: 'FF94A3B8' } };
@@ -503,7 +506,7 @@ const StudentsManagement = () => {
   // ── Export ────────────────────────────────────────────────────────────────
   // Columns:
   // student id, Magaca ardayda, Gender, Xarunta, Magaca Masuul, number masuulka,
-  // Sababta losoo xiray, Relationship, Lacagta Bisha, Xanuuna uuqabo
+  // Sababta losoo xiray, Relationship, Lacagta Bisha, Adeegga Ardayga, Xanuuna uuqabo
   const handleExport = async () => {
     const ExcelJS = await loadExcelJS();
     const workbook = new ExcelJS.Workbook();
@@ -524,6 +527,7 @@ const StudentsManagement = () => {
         admissionReason: item.admissionReason || '',
         relationship: guardian?.relationship ? valueLabel('relationship', guardian.relationship, language) : (guardian?.relationship || 'Father'),
         monthlyFee: Number(item.monthlyFee ?? item.fee ?? 0),
+        serviceFee: Number(item.serviceFee || 0),
         healthConditions: item.healthConditions || ''
       });
     });
@@ -599,6 +603,7 @@ const StudentsManagement = () => {
       branchId: branchId || undefined,
       monthlyFee: Number(row.monthlyFee) || 0,
       fee: Number(row.monthlyFee) || 0,
+      serviceFee: Number(row.serviceFee) || 0,
       fatherName: guardianName,
       fatherPhone: guardianPhone,
       guardianId: guardianId || undefined,
