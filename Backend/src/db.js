@@ -16,7 +16,7 @@ const buildMongoConnectionTargets = (env = process.env) => {
     }
 
     if (env.NODE_ENV !== 'production') {
-        targets.push('mongodb://127.0.0.1:27017/machad');
+        targets.push('mongodb://127.0.0.1:27017/xanaano_db');
     }
 
     if (shouldUseInMemoryFallback(env)) {

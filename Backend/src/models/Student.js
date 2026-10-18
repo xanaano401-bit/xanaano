@@ -51,6 +51,17 @@ const studentSchema = new mongoose.Schema({
         type: Number,
         default: 0
     },
+    // Lacagta Adeegga Ardayga (Service Fee) - Maamulka Sare oo kaliya, laguma xisaabiyo buugga xisaabta guud
+    serviceFee: {
+        type: Number,
+        default: 0,
+        min: 0
+    },
+    serviceFeeDescription: {
+        type: String,
+        default: '',
+        trim: true
+    },
     feeHistory: [
         {
             effectiveCycle: {

@@ -362,6 +362,8 @@ const StudentsManagement = () => {
     gender: 'Male',
     monthlyFee: '',
     fee: '',
+    serviceFee: '',
+    serviceFeeDescription: '',
     feeScope: 'current',
     fatherName: '',
     fatherPhone: '',
@@ -748,6 +750,8 @@ const StudentsManagement = () => {
       classId: '',
       gender: 'Male',
       monthlyFee: '',
+      serviceFee: '',
+      serviceFeeDescription: '',
       feeScope: 'current',
       fatherName: '',
       fatherPhone: '',
@@ -775,6 +779,8 @@ const StudentsManagement = () => {
       classId: item.classId?._id || item.classId || '',
       gender: item.gender || 'Male',
       monthlyFee: item.monthlyFee !== undefined ? item.monthlyFee : (item.fee || ''),
+      serviceFee: item.serviceFee !== undefined ? item.serviceFee : '',
+      serviceFeeDescription: item.serviceFeeDescription || '',
       feeScope: 'current',
       fatherName: item.fatherName || '',
       fatherPhone: item.fatherPhone || '',
@@ -829,6 +835,8 @@ const StudentsManagement = () => {
         gender: formData.gender,
         monthlyFee: Number(formData.monthlyFee) || 0,
         fee: Number(formData.monthlyFee) || 0,
+        serviceFee: Number(formData.serviceFee) || 0,
+        serviceFeeDescription: (formData.serviceFeeDescription || '').trim(),
         feeScope: formData.feeScope || 'current',
         fatherName: formData.guardianName || formData.fatherName || '',
         fatherPhone: formData.guardianPhone || formData.fatherPhone || '',
@@ -1273,9 +1281,20 @@ const StudentsManagement = () => {
                       <span className="text-slate-400 font-semibold flex items-center gap-1.5">
                         <DollarSign size={14} className="text-emerald-500" /> {t('students.studentFee')}:
                       </span>
-                      <span className="font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-xl border border-emerald-500/20">
-                        ${Number(studentFee).toLocaleString()}
-                      </span>
+                      <div className="text-right">
+                        <span className="font-extrabold text-emerald-600 dark:text-emerald-400 bg-emerald-50 dark:bg-emerald-950/40 px-2.5 py-1 rounded-xl border border-emerald-500/20">
+                          ${Number(studentFee).toLocaleString()}
+                        </span>
+                        {Number(item.serviceFee || 0) > 0 && (
+                          <div 
+                            className="mt-1 text-[10px] font-semibold text-blue-600 dark:text-blue-400"
+                            title={`Waxbarasho: $${studentFee} + Adeeg: $${item.serviceFee}`}
+                          >
+                            +${Number(item.serviceFee).toLocaleString()} {t('students.serviceFeeBadge') || 'adeeg'} 
+                            <span className="text-slate-400 font-normal"> (Wadar: ${Number(studentFee + item.serviceFee).toLocaleString()})</span>
+                          </div>
+                        )}
+                      </div>
                     </div>
 
                     {/* Fee Payer Info */}
@@ -1410,8 +1429,19 @@ const StudentsManagement = () => {
                           {item.branchId?.name || '-'}
                         </span>
                       </td>
-                      <td className="px-3 py-3.5 text-xs font-bold text-emerald-600 dark:text-emerald-400 whitespace-nowrap">
-                        ${Number(studentFee).toLocaleString()}
+                      <td className="px-3 py-3.5 text-xs whitespace-nowrap">
+                        <div className="font-bold text-emerald-600 dark:text-emerald-400">
+                          ${Number(studentFee).toLocaleString()}
+                        </div>
+                        {Number(item.serviceFee || 0) > 0 && (
+                          <div 
+                            className="inline-flex items-center gap-1 mt-0.5 px-1.5 py-0.5 rounded text-[10px] font-semibold bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20"
+                            title={`Waxbarasho: $${studentFee} + Adeeg: $${item.serviceFee} = Wadar: $${studentFee + item.serviceFee}`}
+                          >
+                            <span>+${Number(item.serviceFee).toLocaleString()} {t('students.serviceFeeBadge') || 'adeeg'}</span>
+                            <span className="text-slate-400 font-normal">(${Number(studentFee + item.serviceFee).toLocaleString()})</span>
+                          </div>
+                        )}
                       </td>
                       <td className="px-4 py-3.5 text-xs">
                         {guardian ? (
@@ -1587,8 +1617,51 @@ const StudentsManagement = () => {
                       placeholder="0.00"
                       value={formData.monthlyFee}
                       onChange={(e) => setFormData({ ...formData, monthlyFee: e.target.value })}
-                      className="w-full pl-10 pr-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none text-slate-900 dark:text-white"
+                      className="w-full pl-10 pr-4 py-3 rounded-2xl bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none text-slate-900 dark:text-white font-bold"
                     />
+                  </div>
+                </div>
+              </div>
+
+              {/* Service Fee & Total Parent Fee Section */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 p-4 rounded-2xl bg-slate-50 dark:bg-slate-800/50 border border-slate-200/80 dark:border-slate-700/80">
+                <div>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-black uppercase text-slate-500">
+                      {t('students.serviceFeeLabel')}
+                    </label>
+                    <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full">
+                      Maamulka Sare
+                    </span>
+                  </div>
+                  <div className="relative">
+                    <DollarSign size={16} className="absolute left-3.5 top-3.5 text-slate-400" />
+                    <input
+                      type="number"
+                      placeholder={t('students.serviceFeePlaceholder')}
+                      value={formData.serviceFee}
+                      onChange={(e) => setFormData({ ...formData, serviceFee: e.target.value })}
+                      className="w-full pl-10 pr-4 py-3 rounded-2xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 outline-none text-slate-900 dark:text-white font-bold"
+                    />
+                  </div>
+                  <p className="text-[10px] text-slate-400 mt-1 leading-snug">
+                    {t('students.serviceFeeHint')}
+                  </p>
+                </div>
+
+                <div className="flex flex-col justify-between p-3.5 rounded-2xl bg-emerald-500/10 dark:bg-emerald-500/15 border border-emerald-500/20">
+                  <span className="text-[11px] font-black uppercase text-emerald-800 dark:text-emerald-300 tracking-wider">
+                    {t('students.totalParentFee')}
+                  </span>
+                  <div className="my-1">
+                    <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                      ${((Number(formData.monthlyFee) || 0) + (Number(formData.serviceFee) || 0)).toLocaleString()}
+                    </span>
+                  </div>
+                  <div className="flex items-center justify-between text-[10px] font-bold text-slate-500 dark:text-slate-400 pt-1 border-t border-emerald-500/20">
+                    <span>Waxbarasho: ${Number(formData.monthlyFee) || 0}</span>
+                    <span>+</span>
+                    <span>Adeeg: ${Number(formData.serviceFee) || 0}</span>
                   </div>
                 </div>
               </div>
@@ -1910,6 +1983,43 @@ const StudentsManagement = () => {
                   </span>
                 </div>
               </div>
+
+              {/* Service Fee & Total Parent Fee Breakdown (Maamulka Sare) */}
+              {Number(viewingStudent.serviceFee || 0) > 0 && (
+                <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 border border-slate-200/80 dark:border-slate-700/80 text-xs">
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[10px] font-black uppercase text-slate-500 tracking-wider">
+                      Lacagaha Ardayga (Xogta Maamulka Sare)
+                    </span>
+                    <span className="text-[10px] font-bold text-blue-600 dark:text-blue-400 bg-blue-500/10 px-2 py-0.5 rounded-full border border-blue-500/20">
+                      Maamulka Sare
+                    </span>
+                  </div>
+                  <div className="grid grid-cols-3 gap-2 text-center">
+                    <div className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+                      <span className="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">Waxbarasho</span>
+                      <span className="text-sm font-black text-emerald-600 dark:text-emerald-400">
+                        ${Number(viewingStudent.monthlyFee !== undefined ? viewingStudent.monthlyFee : (viewingStudent.fee || 0)).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="bg-white dark:bg-slate-800 p-2.5 rounded-xl border border-slate-200/60 dark:border-slate-700/60">
+                      <span className="text-[9px] uppercase font-bold text-slate-400 block mb-0.5">Adeegga</span>
+                      <span className="text-sm font-black text-blue-600 dark:text-blue-400">
+                        ${Number(viewingStudent.serviceFee || 0).toLocaleString()}
+                      </span>
+                    </div>
+                    <div className="bg-emerald-600 text-white p-2.5 rounded-xl shadow-sm">
+                      <span className="text-[9px] uppercase font-bold text-white/80 block mb-0.5">Wadar Guud</span>
+                      <span className="text-sm font-black">
+                        ${Number((Number(viewingStudent.monthlyFee !== undefined ? viewingStudent.monthlyFee : (viewingStudent.fee || 0))) + Number(viewingStudent.serviceFee || 0)).toLocaleString()}
+                      </span>
+                    </div>
+                  </div>
+                  <p className="text-[9.5px] text-slate-400 mt-2 text-center">
+                    * Lacagta adeegga laguma daro xisaab-xirka daymaha bisha (xog ahaan ayey maamulka ugu qoran tahay).
+                  </p>
+                </div>
+              )}
 
               {/* Guardian / Payer */}
               <div className="p-3.5 rounded-2xl bg-slate-50 dark:bg-slate-800/60 text-xs">

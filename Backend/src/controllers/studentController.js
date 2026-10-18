@@ -95,6 +95,13 @@ const createStudent = asyncHandler(async (req, res) => {
         payload.fee = Number(payload.monthlyFee) || 0;
     }
 
+    if (payload.serviceFee !== undefined) {
+        payload.serviceFee = Math.max(0, Number(payload.serviceFee) || 0);
+    }
+    if (payload.serviceFeeDescription !== undefined) {
+        payload.serviceFeeDescription = String(payload.serviceFeeDescription || '').trim();
+    }
+
     const startFee = Number(payload.monthlyFee || payload.fee || 0);
     const startCycle = (payload.registrationDate && cycleKeyForDate(payload.registrationDate)) || currentCycle();
     if (!Array.isArray(payload.feeHistory) || !payload.feeHistory.length) {
@@ -159,6 +166,13 @@ const updateStudent = asyncHandler(async (req, res) => {
     }
     if (payload.monthlyFee !== undefined && payload.fee === undefined) {
         payload.fee = Number(payload.monthlyFee) || 0;
+    }
+
+    if (payload.serviceFee !== undefined) {
+        payload.serviceFee = Math.max(0, Number(payload.serviceFee) || 0);
+    }
+    if (payload.serviceFeeDescription !== undefined) {
+        payload.serviceFeeDescription = String(payload.serviceFeeDescription || '').trim();
     }
 
     if (payload.monthlyFee !== undefined) {
