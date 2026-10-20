@@ -39,6 +39,11 @@ const userSchema = new mongoose.Schema({
         type: String,
         trim: true
     },
+    jobTitle: {
+        type: String,
+        trim: true,
+        default: 'Teacher'
+    },
     // Responsible person recorded on the teacher registration form.
     masuulName: {
         type: String,

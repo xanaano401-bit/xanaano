@@ -23,6 +23,8 @@ const formatUserResponse = (user, token = null) => {
         gender: user.gender || 'Male',
         role: user.role || 'Teacher',
         teacherCode: user.teacherCode || '',
+        employeeCode: user.teacherCode || '',
+        jobTitle: user.jobTitle || 'Teacher',
         customPermissions: user.customPermissions || {},
         masuulName: user.masuulName || '',
         masuulNumber: user.masuulNumber || '',
@@ -40,12 +42,12 @@ const formatUserResponse = (user, token = null) => {
 // @route   POST /api/users
 // @access  Private
 const registerUser = asyncHandler(async (req, res) => {
-    const { fullName, username, phone, email, password, role, roles, salary, status, branchId, gender, masuulName, masuulNumber, customPermissions } = req.body;
+    const { fullName, username, phone, email, password, role, roles, salary, status, branchId, gender, masuulName, masuulNumber, jobTitle, teacherCode: customCode, employeeCode, customPermissions } = req.body;
     let cleanEmail = email ? String(email).trim().toLowerCase() : '';
 
     if (!cleanEmail) {
-        const namePart = (fullName || username || 'teacher').toLowerCase().replace(/[^a-z0-9]/g, '');
-        cleanEmail = `${namePart}_${Date.now().toString().slice(-4)}@teacher.local`;
+        const namePart = (fullName || username || 'employee').toLowerCase().replace(/[^a-z0-9]/g, '');
+        cleanEmail = `${namePart}_${Date.now().toString().slice(-4)}@employee.local`;
     } else {
         const userExists = await User.findOne({ email: cleanEmail });
         if (userExists) {
@@ -57,15 +59,17 @@ const registerUser = asyncHandler(async (req, res) => {
     const nameToUse = fullName || username || cleanEmail.split('@')[0];
     const roleToUse = role || 'Teacher';
 
-    // Teachers receive a system-issued identifier, allocated here rather than
-    // accepted from the client so it cannot be typed in or duplicated. Other
-    // roles get none, which is why the index is sparse.
-    const teacherCode = roleToUse === 'Teacher'
-        ? await withRetry(
+    let finalCode = (customCode || employeeCode || '').trim();
+    if (finalCode) {
+        const codeExists = await User.exists({ teacherCode: finalCode });
+        if (codeExists) finalCode = '';
+    }
+    if (!finalCode && roleToUse === 'Teacher') {
+        finalCode = await withRetry(
             generateTeacherCode,
             async (code) => Boolean(await User.exists({ teacherCode: code }))
-        )
-        : undefined;
+        );
+    }
 
     const user = await User.create({
         fullName: nameToUse,
@@ -77,6 +81,7 @@ const registerUser = asyncHandler(async (req, res) => {
         passwordHash: password || process.env.DEFAULT_USER_PASSWORD || 'ChangeMe123',
         gender: gender || 'Male',
         role: roleToUse,
+        jobTitle: (jobTitle || 'Teacher').trim(),
         roles: Array.isArray(roles) ? roles : [],
         salary: salary || 0,
         status: status || 'active',
@@ -84,10 +89,10 @@ const registerUser = asyncHandler(async (req, res) => {
         masuulName: masuulName || '',
         masuulNumber: masuulNumber || '',
         customPermissions: normalizePermissions(customPermissions),
-        ...(teacherCode ? { teacherCode } : {})
+        ...(finalCode ? { teacherCode: finalCode } : {})
     });
 
-    const populatedUser = await User.findById(user._id).select('-passwordHash').populate('roles');
+    const populatedUser = await User.findById(user._id).select('-passwordHash').populate('roles').populate('branchId', 'name address phone');
 
     if (user) {
         res.status(201).json(formatUserResponse(populatedUser, generateToken(user._id)));
@@ -191,7 +196,7 @@ const getUsers = asyncHandler(async (req, res) => {
     if (role) {
         query.role = role;
     }
-    const users = await User.find(query).select('-passwordHash').populate('roles');
+    const users = await User.find(query).select('-passwordHash').populate('roles').populate('branchId', 'name address phone');
     const formatted = users.map(u => formatUserResponse(u));
     res.json(formatted);
 });
@@ -251,6 +256,10 @@ const updateUser = asyncHandler(async (req, res) => {
         user.branchId = req.body.branchId || user.branchId;
         user.masuulName = req.body.masuulName !== undefined ? req.body.masuulName : user.masuulName;
         user.masuulNumber = req.body.masuulNumber !== undefined ? req.body.masuulNumber : user.masuulNumber;
+        user.jobTitle = req.body.jobTitle !== undefined ? req.body.jobTitle : user.jobTitle;
+        if (req.body.teacherCode || req.body.employeeCode) {
+            user.teacherCode = String(req.body.teacherCode || req.body.employeeCode).trim();
+        }
 
         // Editing an account replaces its custom grants outright, so clearing a
         // checkbox actually revokes access. Omitting the field leaves them as-is.
@@ -273,7 +282,7 @@ const updateUser = asyncHandler(async (req, res) => {
         }
 
         await user.save();
-        const updatedUser = await User.findById(user._id).select('-passwordHash').populate('roles');
+        const updatedUser = await User.findById(user._id).select('-passwordHash').populate('roles').populate('branchId', 'name address phone');
 
         res.json(formatUserResponse(updatedUser));
     } else {

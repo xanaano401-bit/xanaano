@@ -17,14 +17,16 @@ const generateStudentCode = async () => {
     return String(STUDENT_FIRST_NUMBER + sequence - 1);
 };
 
-//   Teacher -> TCH-2026-0001
-// The year is part of the teacher key so each intake year restarts at 1 while
+//   Employee -> EMP-2026-0001
+// The year is part of the employee key so each intake year restarts at 1 while
 // the full code stays unique for all time.
 const generateTeacherCode = async () => {
     const year = new Date().getFullYear();
-    const sequence = await Counter.next(`teacher:${year}`);
-    return `TCH-${year}-${String(sequence).padStart(4, '0')}`;
+    const sequence = await Counter.next(`employee:${year}`);
+    return `EMP-${year}-${String(sequence).padStart(4, '0')}`;
 };
+
+const generateEmployeeCode = generateTeacherCode;
 
 // A duplicate key error can still surface if a code was created outside this
 // allocator (legacy data), so callers retry a small number of times.
@@ -36,4 +38,4 @@ const withRetry = async (generate, exists, attempts = 5) => {
     throw new Error('Unable to allocate a unique identifier. Please try again.');
 };
 
-module.exports = { generateStudentCode, generateTeacherCode, withRetry };
+module.exports = { generateStudentCode, generateTeacherCode, generateEmployeeCode, withRetry };

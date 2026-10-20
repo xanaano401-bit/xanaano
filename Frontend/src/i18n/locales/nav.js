@@ -1,7 +1,7 @@
 // Navigation, layout chrome (sidebar, navbar, footer) and the language picker.
 export default {
   en: {
-    dashboard: 'Dashboard', quran: "Qur'aan", quranSurahs: 'Surah Schedule', quranLessons: 'Lesson Schedule', academicManagement: 'Academic Management', classes: 'Classes', teachers: 'Teachers',
+    dashboard: 'Dashboard', quran: "Qur'aan", quranSurahs: 'Surah Schedule', quranLessons: 'Lesson Schedule', academicManagement: 'Academic Management', classes: 'Classes', teachers: 'Employee', employees: 'Employee',
     students: 'Students', guardians: 'Guardians', exitStudents: 'Exit Students', classPromotion: 'Class Promotion',
     attendance: 'Attendance', studentAttendance: 'Student Attendance', teacherAttendance: 'Teacher Attendance',
     sessionSettings: 'Session Settings', examinations: 'Examinations', exams: 'Exams', markEntry: 'Mark Entry',
@@ -29,7 +29,7 @@ export default {
     }
   },
   so: {
-    dashboard: 'Dulmarka Nidaamka', quran: "Qur'aan", quranSurahs: 'Jadwalka Suuradaha', quranLessons: 'Jadwalka Cashirada', academicManagement: 'Maamulka Waxbarashada', classes: 'Fasallada', teachers: 'Macallimiinta',
+    dashboard: 'Dulmarka Nidaamka', quran: "Qur'aan", quranSurahs: 'Jadwalka Suuradaha', quranLessons: 'Jadwalka Cashirada', academicManagement: 'Maamulka Waxbarashada', classes: 'Fasallada', teachers: 'Shaqaalaha', employees: 'Shaqaalaha',
     students: 'Ardayda', guardians: 'Masuuliyiinta', exitStudents: 'Ardayda Baxay', classPromotion: 'Dallacsiinta Fasalka',
     attendance: 'Xaadirinta', studentAttendance: 'Xaadirinta Ardayda', teacherAttendance: 'Xaadirinta Macallimiinta',
     sessionSettings: 'Dejinta Fadhiyada', examinations: 'Imtixaannada', exams: 'Imtixaannada', markEntry: 'Gelinta Dhibcaha',
