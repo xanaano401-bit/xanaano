@@ -1,17 +1,71 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { Users, Search, Phone, ChevronDown, ChevronRight, Printer, FileDown, Wallet, X, Edit2, Save, UserCheck, AlertCircle } from 'lucide-react';
+import { useSearchParams } from 'react-router-dom';
+import { Users, Search, Phone, ChevronDown, ChevronRight, Printer, FileDown, Wallet, X, Edit2, Save, UserCheck, AlertCircle, CalendarRange } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import api from '../services/api';
 import { useAlert } from '../components/common/alerts/useAlert';
 import { useLanguage } from '../i18n/LanguageContext.jsx';
-import { currentCycle, cycleLabel } from '../utils/billingCycle';
+import { currentCycle, cycleLabel, cycleShortLabel } from '../utils/billingCycle';
 
 const fmtMoney = (n) =>
   Number(n || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 const PayersManagement = () => {
   const { showAlert } = useAlert();
-  const { t, locale } = useLanguage();
+  const { t, months: MONTH_NAMES, locale } = useLanguage();
+  const [searchParams, setSearchParams] = useSearchParams();
+
+  // Period / Billing Cycle selection: bounds students by their registrationDate in that cycle
+  const initialMonthParam = searchParams.get('month') || searchParams.get('cycle');
+  const [initYear, initMonth] = (initialMonthParam && /^\d{4}-\d{2}$/.test(initialMonthParam)
+    ? initialMonthParam
+    : currentCycle()
+  ).split('-').map(Number);
+  const [year, setYear] = useState(initYear);
+  const [month, setMonth] = useState(initMonth - 1); // 0-11
+  const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
+
+  const years = useMemo(() => {
+    const thisYear = new Date().getFullYear();
+    return [thisYear - 2, thisYear - 1, thisYear, thisYear + 1];
+  }, []);
+
+  const monthOptions = useMemo(() => {
+    const opts = [];
+    for (const y of [...years].sort((a, b) => b - a)) {
+      for (let m = 11; m >= 0; m -= 1) {
+        const value = `${y}-${String(m + 1).padStart(2, '0')}`;
+        opts.push({
+          value,
+          label: t('monthlyPayments.cycleOption', {
+            month: MONTH_NAMES?.[m] || `Month ${m + 1}`,
+            year: y,
+            range: cycleShortLabel(value)
+          })
+        });
+      }
+    }
+    return opts;
+  }, [years, MONTH_NAMES, t]);
+
+  // Sync with URL query parameter when it changes
+  useEffect(() => {
+    const m = searchParams.get('month') || searchParams.get('cycle');
+    if (m && /^\d{4}-\d{2}$/.test(m)) {
+      const [y, mon] = m.split('-').map(Number);
+      setYear(y);
+      setMonth(mon - 1);
+    }
+  }, [searchParams]);
+
+  // Sync active billing cycle to whole system
+  useEffect(() => {
+    try {
+      if (monthKey && /^\d{4}-\d{2}$/.test(monthKey)) {
+        sessionStorage.setItem('active_billing_cycle', monthKey);
+      }
+    } catch (_) {}
+  }, [monthKey]);
   // Dynamic tenant branding
   const [tenantInfo, setTenantInfo] = useState(() => {
     try {
@@ -53,12 +107,16 @@ const PayersManagement = () => {
   });
   const [saving, setSaving] = useState(false);
 
-  const fetchPayers = async () => {
+  const fetchPayers = async (cycleToFetch = monthKey) => {
     try {
       setLoading(true);
       setError(null);
-      const { data } = await api.get('/cashbook/payers');
-      setPayers(data || []);
+      const { data } = await api.get('/cashbook/payers', {
+        params: { month: cycleToFetch }
+      });
+      const rawPayers = Array.isArray(data) ? data : (data?.payers || []);
+      const cleanPayers = rawPayers.filter(p => !p.key?.startsWith('cashbook_direct_tuition'));
+      setPayers(cleanPayers);
     } catch (err) {
       console.error('Failed to load payers', err);
       const msg = err.response?.data?.message || err.message || t('payers.loadFailed');
@@ -132,8 +190,8 @@ const PayersManagement = () => {
   };
 
   useEffect(() => {
-    fetchPayers();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    fetchPayers(monthKey);
+  }, [monthKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Filter payers by name, primary phone, secondary phone (number 2), or linked student names
   const filtered = useMemo(() => {
@@ -184,7 +242,7 @@ const PayersManagement = () => {
     doc.text(t('payers.pdf.title'), 14, 12);
     doc.setFontSize(8);
     doc.setFont('helvetica', 'normal');
-    doc.text(`${t('payers.pdf.generated')}: ${new Date().toLocaleString(locale)}   |   ${t('payers.pdf.payers')}: ${filtered.length}`, 14, 20);
+    doc.text(`${t('monthlyPayments.print.cycle')}: ${cycleLabel(monthKey)}   |   ${t('payers.pdf.generated')}: ${new Date().toLocaleString(locale)}   |   ${t('payers.pdf.payers')}: ${filtered.length}`, 14, 20);
 
     const cols = { no: 12, name: 22, number: 78, students: 132, total: 155, paid: 190 };
     let y = 36;
@@ -369,7 +427,7 @@ const PayersManagement = () => {
               {t('payers.title')} - {t('payers.printChecklist')}
             </h2>
             <p className="text-[7.5pt] text-black mt-0.5">
-              {t('monthlyPayments.print.cycle')}: <span className="font-bold text-black">{cycleLabel(currentCycle())}</span> · {t('monthlyPayments.print.printed')}: <span className="text-black">{new Date().toLocaleDateString(locale)} {new Date().toLocaleTimeString(locale || [], { hour: '2-digit', minute: '2-digit' })}</span>
+              {t('monthlyPayments.print.cycle')}: <span className="font-bold text-black">{cycleLabel(monthKey)}</span> · {t('monthlyPayments.print.printed')}: <span className="text-black">{new Date().toLocaleDateString(locale)} {new Date().toLocaleTimeString(locale || [], { hour: '2-digit', minute: '2-digit' })}</span>
             </p>
           </div>
           <div className="text-right text-[8pt] leading-tight text-black">
@@ -391,13 +449,39 @@ const PayersManagement = () => {
           </div>
           <div>
             <h1 className="text-4xl font-black text-slate-900 dark:text-white tracking-tight uppercase leading-none">{t('payers.title')}</h1>
-            <p className="text-slate-500 dark:text-slate-400 text-[10px] font-black mt-2 uppercase tracking-[0.2em] opacity-80">
-              {t('payers.subtitle')}
+            <p className="text-slate-500 dark:text-slate-400 text-[10px] font-black mt-2 uppercase tracking-[0.2em] opacity-80 flex items-center gap-2 flex-wrap">
+              <span>{t('payers.subtitle')}</span>
+              <span className="text-slate-300 dark:text-slate-600">·</span>
+              <span className="text-brand-500 font-extrabold">{cycleLabel(monthKey)}</span>
             </p>
           </div>
         </div>
 
         <div className="flex flex-wrap items-center gap-3">
+          {/* Period selector - Cycle selection */}
+          <div className="flex items-center gap-3 bg-white dark:bg-slate-900 rounded-2xl px-5 py-3 border border-slate-100 dark:border-slate-800 shadow-sm w-full sm:w-auto print:hidden">
+            <label htmlFor="payer-cycle-select" className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400 shrink-0 leading-tight">
+              {t('monthlyPayments.cycle')}
+            </label>
+            <select
+              id="payer-cycle-select"
+              value={monthKey}
+              onChange={(e) => {
+                const [y, m] = e.target.value.split('-');
+                setYear(Number(y));
+                setMonth(Number(m) - 1);
+                const nextParams = new URLSearchParams(searchParams);
+                nextParams.set('month', e.target.value);
+                setSearchParams(nextParams);
+              }}
+              className="w-full min-w-0 bg-transparent outline-none text-xs font-bold text-slate-900 dark:text-white cursor-pointer"
+            >
+              {monthOptions.map((o) => (
+                <option key={o.value} value={o.value}>{o.label}</option>
+              ))}
+            </select>
+          </div>
+
           <button
             onClick={handleExportPDF}
             className="flex items-center gap-2 px-6 py-3.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-2xl text-xs font-black uppercase tracking-wider transition-all shadow-sm hover:bg-slate-50 dark:hover:bg-slate-700 active:scale-95"
@@ -621,7 +705,7 @@ const PayersManagement = () => {
             <Wallet size={22} strokeWidth={2.5} />
           </div>
           <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{t('payers.grandTotal')}</p>
+            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">{cycleLabel(monthKey)} · {t('payers.grandTotal')}</p>
             <p className="text-sm font-bold text-slate-500 dark:text-slate-400">
               {t('payers.acrossPayers', { count: payers.length })}
             </p>

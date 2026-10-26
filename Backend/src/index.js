@@ -135,6 +135,7 @@ app.use('/api/analytics', require('./routes/aiAnalyticsRoutes'));
 app.use('/api/dashboard', require('./routes/dashboardRoutes'));
 app.use('/api/settings', require('./routes/settingsRoutes'));
 app.use('/api/tenants', require('./routes/tenantRoutes'));
+app.use('/api/audit-logs', require('./routes/auditLogRoutes'));
 app.use('/api/exams', require('./routes/examRoutes'));
 
 // Health check. Deliberately minimal: reports liveness and DB connection state

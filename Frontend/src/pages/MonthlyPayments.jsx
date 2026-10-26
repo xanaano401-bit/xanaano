@@ -97,6 +97,15 @@ const MonthlyPayments = () => {
 
   const monthKey = `${year}-${String(month + 1).padStart(2, '0')}`;
 
+  // Sync active billing cycle to whole system
+  useEffect(() => {
+    try {
+      if (monthKey && /^\d{4}-\d{2}$/.test(monthKey)) {
+        sessionStorage.setItem('active_billing_cycle', monthKey);
+      }
+    } catch (_) {}
+  }, [monthKey]);
+
   const fetchPayers = async () => {
     try {
       setLoading(true);
@@ -105,7 +114,9 @@ const MonthlyPayments = () => {
         ? { view: 'previousDebt' }
         : { month: monthKey, view: viewParam || undefined };
       const { data } = await api.get('/cashbook/payers', { params });
-      setPayers(data || []);
+      const rawPayers = Array.isArray(data) ? data : (data?.payers || []);
+      const cleanPayers = rawPayers.filter(p => !p.key?.startsWith('cashbook_direct_tuition'));
+      setPayers(cleanPayers);
     } catch (err) {
       console.error('Failed to load monthly payments', err);
       const msg = err.response?.data?.message || err.message || t('monthlyPayments.loadFailed');
@@ -169,8 +180,8 @@ const MonthlyPayments = () => {
       const rem = Number(p.remaining !== undefined ? p.remaining : Math.max(0, fee - paid));
       expected += fee;
       collected += paid;
-      pending += rem;
-      studentsCount += Number(p.studentCount || 0);
+      pending += (p.paid ? 0 : rem);
+      studentsCount += Number(p.studentCount !== undefined ? p.studentCount : (p.students?.length || 0));
 
       if (paid > 0) {
         paidPayersCount += 1;
@@ -188,7 +199,7 @@ const MonthlyPayments = () => {
       pendingPayersCount,
       studentsCount
     };
-  }, [payers]);
+  }, [payers, monthKey, isPreviousDebtView]);
 
   const years = useMemo(() => {
     const thisYear = new Date().getFullYear();

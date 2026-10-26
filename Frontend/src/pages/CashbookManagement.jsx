@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react';
 import {
   Wallet,
   Edit2,
@@ -12,6 +12,10 @@ import {
   RotateCcw,
   AlertCircle,
   Lock,
+  ArrowLeft,
+  ChevronLeft,
+  ChevronRight,
+  Calendar,
   Unlock,
   Clock,
   ShieldCheck,
@@ -90,6 +94,17 @@ const getPayerMonthLabel = (baseKey, offset = 0) => {
   };
 };
 
+const getActiveCycle = () => {
+  try {
+    const search = new URLSearchParams(window.location.search);
+    const m = search.get('month') || search.get('cycle');
+    if (m && /^\d{4}-\d{2}$/.test(m)) return m;
+    const s = sessionStorage.getItem('active_billing_cycle');
+    if (s && /^\d{4}-\d{2}$/.test(s)) return s;
+  } catch (_) {}
+  return currentCycle();
+};
+
 const emptyTransactionForm = () => ({
   type: 'Income',
   categoryId: '',
@@ -105,7 +120,7 @@ const emptyTransactionForm = () => ({
   receiverEntityType: '',
   receiverEntityId: '',
   date: new Date().toISOString().split('T')[0],
-  targetMonth: currentCycle(),
+  targetMonth: getActiveCycle(),
   description: '',
   isBackdated: false,
   backdatedReason: ''
@@ -119,6 +134,31 @@ const CashbookManagement = () => {
   const [categories, setCategories] = useState([]);
   const [entries, setEntries] = useState([]);
   const [deletedEntries, setDeletedEntries] = useState([]);
+  const [trashCycle, setTrashCycle] = useState('All');
+
+  const trashCycleOptions = useMemo(() => {
+    const cur = currentCycle();
+    const list = [
+      { key: 'All', label: language === 'so' ? 'Dhammaan Xilliyada (All Cycles)' : 'All Cycles', isCurrent: false }
+    ];
+    for (let i = 1; i >= -12; i--) {
+      const key = addCycles(cur, i);
+      list.push({
+        key,
+        label: `${key} · ${cycleShortLabel(key)}`,
+        isCurrent: key === cur
+      });
+    }
+    return list;
+  }, [language]);
+
+  const filteredDeletedEntries = useMemo(() => {
+    if (trashCycle === 'All') return deletedEntries;
+    return deletedEntries.filter((item) => {
+      const cycle = item.targetMonth || (item.date ? cycleKeyForDate(item.date) : null) || (item.deletedAt ? cycleKeyForDate(item.deletedAt) : null);
+      return cycle === trashCycle;
+    });
+  }, [deletedEntries, trashCycle]);
   const [wallets, setWallets] = useState([]);
   const [payerOptions, setPayerOptions] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -147,10 +187,45 @@ const CashbookManagement = () => {
   const [editingEntry, setEditingEntry] = useState(null);
   const editingEntryRef = useRef(null);
 
+  const [searchQuery, setSearchQuery] = useState('');
   const [filterType, setFilterType] = useState('All');
   const [filterCategory, setFilterCategory] = useState('All');
+  const [filterCycle, setFilterCycle] = useState(() => {
+    try {
+      const search = new URLSearchParams(window.location.search);
+      const urlCycle = search.get('month') || search.get('cycle');
+      if (urlCycle && /^\d{4}-\d{2}$/.test(urlCycle)) return urlCycle;
+      const saved = sessionStorage.getItem('active_billing_cycle');
+      if (saved && /^\d{4}-\d{2}$/.test(saved)) return saved;
+    } catch (_) {}
+    return 'All';
+  });
   const [dateFrom, setDateFrom] = useState('');
   const [dateTo, setDateTo] = useState('');
+
+  const cashbookCycleOptions = useMemo(() => {
+    const cur = currentCycle();
+    const list = [
+      { key: 'All', label: language === 'so' ? 'Dhammaan Xilliyada (All Cycles)' : 'All Cycles', isCurrent: false }
+    ];
+    for (let i = 1; i >= -18; i--) {
+      const key = addCycles(cur, i);
+      list.push({
+        key,
+        label: `${key} • ${cycleShortLabel(key)}`,
+        isCurrent: key === cur
+      });
+    }
+    return list;
+  }, [language]);
+
+  useEffect(() => {
+    try {
+      if (filterCycle && filterCycle !== 'All' && /^\d{4}-\d{2}$/.test(filterCycle)) {
+        sessionStorage.setItem('active_billing_cycle', filterCycle);
+      }
+    } catch (_) {}
+  }, [filterCycle]);
   const [senderLocked, setSenderLocked] = useState(false);
   const [receiverLocked, setReceiverLocked] = useState(false);
   const [walletDirection, setWalletDirection] = useState('receiver');
@@ -160,7 +235,7 @@ const CashbookManagement = () => {
   // The most a responsible payer may pay: total owed (previous arrears + current balance),
   // plus any advance months chosen. In edit mode, it allows at least the entry's existing amount.
   const payerTotalOutstanding = Number(payerInfo?.totalDue ?? (Number(payerInfo?.totalBalance || 0) + Number(payerInfo?.previousBalance || 0)));
-  const maxPayable = (payerInfo && payerInfo.kind === 'responsible')
+  const maxPayable = (walletDirection === 'receiver' && payerInfo && payerInfo.kind === 'responsible')
     ? (monthsToPay === 1
         ? Math.max(payerTotalOutstanding, editingEntry ? Number(editingEntry.amount || 0) : 0)
         : payerTotalOutstanding + Number(payerInfo.totalMonthlyFee || 0) * (monthsToPay - 1))
@@ -172,13 +247,13 @@ const CashbookManagement = () => {
   // When the number of pre-paid months changes, re-fill the amount with the target month(s) amount.
   useEffect(() => {
     if (editingEntryRef.current) return;
-    if (payerInfo && payerInfo.kind === 'responsible' && monthsToPay > 1) {
+    if (walletDirection === 'receiver' && payerInfo && payerInfo.kind === 'responsible' && monthsToPay > 1) {
       const base = Number(payerInfo.totalDue ?? (Number(payerInfo.totalBalance || 0) + Number(payerInfo.previousBalance || 0)));
       const targetAmount = base + Number(payerInfo.totalMonthlyFee || 0) * (monthsToPay - 1);
       setTransactionForm((prev) => ({ ...prev, amount: targetAmount }));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [monthsToPay]);
+  }, [monthsToPay, walletDirection]);
 
   const isInstituteAccount = (phone, list = wallets) =>
     (list || []).some((w) => w.accountNumber && (w.accountNumber === phone || digitsOnly(w.accountNumber) === digitsOnly(phone)));
@@ -317,6 +392,7 @@ const CashbookManagement = () => {
       setPayerInfo(null);
     } else {
       setReceiverLocked(false);
+      setPayerInfo(null);
     }
   };
 
@@ -396,8 +472,9 @@ const CashbookManagement = () => {
           setPayerInfo(null);
         }
       } else {
-        if (found) {
-          // Auto-fill the amount with the current remaining balance owed/payable only for new transactions.
+        const isStaff = found && (entityType === 'teacher' || entityType === 'user' || info?.kind === 'staff');
+        if (isStaff) {
+          // Auto-fill the amount with the current remaining balance owed/payable only for new transactions (e.g. staff salary).
           const rem = info?.remainingBalance !== undefined
             ? Number(info.remainingBalance)
             : info?.totalBalance !== undefined
@@ -406,14 +483,15 @@ const CashbookManagement = () => {
           setTransactionForm((prev) => ({
             ...prev,
             receiverName: name,
-            receiverEntityType: entityType === 'teacher' ? 'teacher' : entityType === 'user' ? 'user' : entityType,
+            receiverEntityType: entityType === 'teacher' ? 'teacher' : 'user',
             receiverEntityId: entityId || '',
-            amount: editingEntryRef.current ? prev.amount : (rem !== null && !isNaN(rem) ? rem : prev.amount)
+            amount: editingEntryRef.current ? prev.amount : (rem !== null && !isNaN(rem) && rem > 0 ? rem : prev.amount)
           }));
           setReceiverLocked(true);
           setPayerInfo(info || null);
         } else {
           setReceiverLocked(false);
+          setPayerInfo(null);
         }
       }
     } catch {
@@ -422,6 +500,7 @@ const CashbookManagement = () => {
         setPayerInfo(null);
       } else {
         setReceiverLocked(false);
+        setPayerInfo(null);
       }
     }
   }, [currentMonthStr]);
@@ -442,7 +521,7 @@ const CashbookManagement = () => {
 
     // Automatically calculate amount remaining for the newly selected month:
     let newAmount = transactionFormRef.current.amount;
-    if (payerInfo && payerInfo.kind === 'responsible') {
+    if (walletDirection === 'receiver' && payerInfo && payerInfo.kind === 'responsible') {
       if (newMonth < currentMonthStr) {
         // Arrears cycle: set amount to arrears of that specific month
         const arr = payerInfo.arrears?.find((a) => a.month === newMonth);
@@ -596,7 +675,7 @@ const CashbookManagement = () => {
       return false;
     }
     // A fee payer may never pay more than they owe (current month + any pre-paid months).
-    if (maxPayable !== null && Number(transactionForm.amount) > maxPayable + 0.001) {
+    if (walletDirection === 'receiver' && maxPayable !== null && Number(transactionForm.amount) > maxPayable + 0.001) {
       showAlert({
         type: 'warning',
         title: t('cashbook.amountTooHighTitle'),
@@ -838,6 +917,39 @@ const CashbookManagement = () => {
     const d = item.date || '';
     if (dateFrom && d < dateFrom) return false;
     if (dateTo && d > dateTo) return false;
+
+    if (filterCycle !== 'All') {
+      const itemCycle = item.targetMonth || (d ? cycleKeyForDate(d) : null);
+      if (itemCycle !== filterCycle) return false;
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      const sName = (item.senderName || item.payerName || '').toLowerCase();
+      const sPhone = (item.senderPhone || '').toLowerCase();
+      const rName = (item.receiverName || '').toLowerCase();
+      const rPhone = (item.receiverPhone || '').toLowerCase();
+      const catTitle = (cat?.title || '').toLowerCase();
+      const desc = (item.description || '').toLowerCase();
+      const method = (item.method || '').toLowerCase();
+      const amt = String(item.amount ?? '');
+      const walletName = (item.walletId?.name || '').toLowerCase();
+      const targetMonth = (item.targetMonth || '').toLowerCase();
+
+      const matches =
+        sName.includes(q) ||
+        sPhone.includes(q) ||
+        rName.includes(q) ||
+        rPhone.includes(q) ||
+        catTitle.includes(q) ||
+        desc.includes(q) ||
+        method.includes(q) ||
+        amt.includes(q) ||
+        walletName.includes(q) ||
+        targetMonth.includes(q);
+
+      if (!matches) return false;
+    }
     return true;
   });
 
@@ -1419,7 +1531,8 @@ const CashbookManagement = () => {
                 )}
               </div>
 
-            {/* Target Billing Cycle — available for all transactions */}
+            {/* Target Billing Cycle — only show for fee collections or teacher salary payments */}
+            {(walletDirection === 'receiver' || (walletDirection === 'sender' && payerInfo?.kind === 'staff')) && (
             <div>
               <div className="flex items-center justify-between mb-1">
                 <label className="block text-xs font-black uppercase text-slate-500">
@@ -1446,7 +1559,7 @@ const CashbookManagement = () => {
               >
                 {monthOptions.map((opt) => {
                   let extra = '';
-                  if (payerInfo && payerInfo.kind === 'responsible') {
+                  if (walletDirection === 'receiver' && payerInfo && payerInfo.kind === 'responsible') {
                     if (opt.value < currentMonthStr) {
                       const arr = payerInfo.arrears?.find((a) => a.month === opt.value);
                       extra = arr ? ` · ${t('cashbook.arrearsTag')}: ${fmtMoney(arr.balance)}` : ` · ${t('cashbook.fullyPaid')}`;
@@ -1467,8 +1580,9 @@ const CashbookManagement = () => {
                 {t('cashbook.targetMonthHint')}
               </p>
             </div>
+            )}
 
-            {transactionForm.targetMonth && transactionForm.targetMonth < currentMonthStr && (() => {
+            {walletDirection === 'receiver' && payerInfo && payerInfo.kind === 'responsible' && transactionForm.targetMonth && transactionForm.targetMonth < currentMonthStr && (() => {
               const [y, m] = transactionForm.targetMonth.split('-').map(Number);
               const mName = monthNames()[m - 1];
               const curObj = getPayerMonthLabel(currentMonthStr, 0);
@@ -1498,7 +1612,7 @@ const CashbookManagement = () => {
 
 
             {/* Quick Action buttons for Responsible Payers */}
-            {payerInfo && payerInfo.kind === 'responsible' && (Number(payerInfo.previousBalance || 0) > 0 || Number(payerInfo.totalBalance || 0) > 0) && (() => {
+            {walletDirection === 'receiver' && payerInfo && payerInfo.kind === 'responsible' && (Number(payerInfo.previousBalance || 0) > 0 || Number(payerInfo.totalBalance || 0) > 0) && (() => {
               const oldest = payerInfo.arrears?.[0]?.month || currentMonthStr;
               const totalOwed = Number(payerInfo.totalDue ?? (Number(payerInfo.totalBalance || 0) + Number(payerInfo.previousBalance || 0)));
               return (
@@ -1574,7 +1688,7 @@ const CashbookManagement = () => {
                 placeholder="0.00"
                 className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-lg font-black"
               />
-              {payerInfo && payerInfo.kind === 'responsible' && maxPayable !== null && (
+              {walletDirection === 'receiver' && payerInfo && payerInfo.kind === 'responsible' && maxPayable !== null && (
                 <p className="text-[11px] text-emerald-600 dark:text-emerald-400 mt-1 font-semibold">
                   {Number(payerInfo.previousBalance || 0) > 0 ? (
                     <>
@@ -1680,7 +1794,7 @@ const CashbookManagement = () => {
               </div>
             )}
 
-            {payerInfo && payerInfo.kind === 'responsible' && payerInfo.count > 0 && (() => {
+            {walletDirection === 'receiver' && payerInfo && payerInfo.kind === 'responsible' && payerInfo.count > 0 && (() => {
               const entered = Number(transactionForm.amount) || 0;
               const isTargetPast = transactionForm.targetMonth && transactionForm.targetMonth < currentMonthStr;
               const targetArr = isTargetPast ? payerInfo.arrears?.find((a) => a.month === transactionForm.targetMonth) : null;
@@ -1979,8 +2093,33 @@ const CashbookManagement = () => {
               <Search size={16} className="text-slate-400" />
               <p className="text-[10px] font-black uppercase tracking-widest text-slate-400">{t('cashbook.filterTransactions')}</p>
             </div>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              <div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-12 gap-4">
+              <div className="sm:col-span-2 lg:col-span-3">
+                <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">
+                  {t('common.search', 'Baaritaanka')}
+                </label>
+                <div className="relative">
+                  <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none" />
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder={t('cashbook.searchPlaceholder', 'Raadi magac, tel, qoraal, lacag...')}
+                    className="w-full pl-10 pr-9 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-sm focus:ring-2 focus:ring-brand-500/20"
+                  />
+                  {searchQuery && (
+                    <button
+                      type="button"
+                      onClick={() => setSearchQuery('')}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 p-1 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 transition-colors"
+                      title={t('common.clear', 'Nadiifi')}
+                    >
+                      <X size={14} />
+                    </button>
+                  )}
+                </div>
+              </div>
+              <div className="lg:col-span-2">
                 <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">{t('common.type')}</label>
                 <select
                   value={filterType}
@@ -1995,7 +2134,7 @@ const CashbookManagement = () => {
                   <option value="Expense">{tv('Expense')}</option>
                 </select>
               </div>
-              <div>
+              <div className="lg:col-span-2">
                 <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">{t('common.category')}</label>
                 <select
                   value={filterCategory}
@@ -2010,7 +2149,21 @@ const CashbookManagement = () => {
                   ))}
                 </select>
               </div>
-              <div>
+              <div className="lg:col-span-2">
+                <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">{language === 'so' ? 'Wareegga (Cycle)' : 'Cycle'}</label>
+                <select
+                  value={filterCycle}
+                  onChange={(e) => setFilterCycle(e.target.value)}
+                  className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
+                >
+                  {cashbookCycleOptions.map((c) => (
+                    <option key={c.key} value={c.key}>
+                      {c.label} {c.isCurrent ? '★' : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="lg:col-span-2">
                 <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">{t('cashbook.fromDate')}</label>
                 <input
                   type="date"
@@ -2019,7 +2172,7 @@ const CashbookManagement = () => {
                   className="w-full px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800 text-slate-900 dark:text-white text-sm"
                 />
               </div>
-              <div>
+              <div className="lg:col-span-2">
                 <label className="block text-[10px] font-black uppercase text-slate-500 mb-1">{t('cashbook.toDate')}</label>
                 <input
                   type="date"
@@ -2045,6 +2198,7 @@ const CashbookManagement = () => {
                 onClick={() => {
                   setDateFrom('');
                   setDateTo('');
+
                 }}
                 className="px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-[11px] font-black uppercase tracking-wider"
               >
@@ -2055,6 +2209,8 @@ const CashbookManagement = () => {
                 onClick={() => {
                   setFilterType('All');
                   setFilterCategory('All');
+                  setFilterCycle('All');
+                  setSearchQuery('');
                   setDateFrom('');
                   setDateTo('');
                 }}
@@ -2063,7 +2219,7 @@ const CashbookManagement = () => {
                 {t('common.reset')}
               </button>
               <span className="ml-auto text-[11px] font-bold text-slate-400">
-                {t('cashbook.results', { count: filteredEntries.length })}
+                {t('cashbook.results', { count: filteredEntries.length, defaultValue: `${filteredEntries.length} natiijo` })}
               </span>
             </div>
           </div>
@@ -2349,6 +2505,16 @@ const CashbookManagement = () => {
           <div className="bg-gradient-to-r from-slate-900 via-rose-950 to-slate-900 rounded-[32px] p-8 text-white relative overflow-hidden border border-slate-800 shadow-xl">
             <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
               <div className="flex items-center gap-4">
+                <button
+                  type="button"
+                  onClick={() => setActivePanel('all')}
+                  className="p-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-black text-xs uppercase tracking-wider backdrop-blur-md transition-all active:scale-95 flex items-center gap-2 border border-white/10"
+                  title={language === 'so' ? 'Dib ugu laabo Diiwaanka' : 'Back to Transactions'}
+                >
+                  <ArrowLeft size={16} strokeWidth={2.5} />
+                  <span>{language === 'so' ? 'Dib' : 'Back'}</span>
+                </button>
+
                 <div className="p-3.5 bg-rose-500/20 rounded-2xl border border-rose-500/30 text-rose-400">
                   <Trash2 size={28} />
                 </div>
@@ -2360,14 +2526,96 @@ const CashbookManagement = () => {
                 </div>
               </div>
 
-              <div className="px-5 py-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
-                <span className="text-[10px] uppercase font-black tracking-widest text-slate-400 block mb-0.5">
-                  Wadarta la Tirtiray
-                </span>
-                <span className="text-base font-black font-mono text-rose-300">
-                  {deletedEntries.length} Macaamil
-                </span>
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={() => setActivePanel('all')}
+                  className="hidden sm:flex items-center gap-2 px-4 py-3 rounded-2xl bg-white/10 hover:bg-white/20 text-white font-black text-xs uppercase tracking-wider backdrop-blur-md transition-all active:scale-95 border border-white/10"
+                >
+                  <ArrowLeft size={16} strokeWidth={2.5} />
+                  <span>{language === 'so' ? 'Dib ugu noqo Diiwaanka' : 'Back to Transactions'}</span>
+                </button>
+
+                <div className="px-5 py-3 rounded-2xl bg-white/5 border border-white/10 backdrop-blur-md">
+                  <span className="text-[10px] uppercase font-black tracking-widest text-slate-400 block mb-0.5">
+                    {trashCycle !== 'All' ? `La Tirtiray (${trashCycle})` : 'Wadarta la Tirtiray'}
+                  </span>
+                  <span className="text-base font-black font-mono text-rose-300">
+                    {filteredDeletedEntries.length} Macaamil
+                  </span>
+                </div>
               </div>
+            </div>
+          </div>
+
+          {/* Billing Cycle Selector for Trash */}
+          <div className="bg-white dark:bg-slate-900 rounded-[28px] border border-slate-100 dark:border-slate-800 shadow-sm p-5 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <div className="w-11 h-11 rounded-2xl bg-rose-50 dark:bg-rose-950/50 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 border border-rose-200/50">
+                <Calendar size={22} strokeWidth={2.5} />
+              </div>
+              <div>
+                <span className="text-[10px] font-black uppercase tracking-widest text-rose-500">
+                  {language === 'so' ? 'Wareegga Xisaabeed ee Tirtirista' : 'Trash Billing Cycle'}
+                </span>
+                <h3 className="text-sm sm:text-base font-black text-slate-900 dark:text-white capitalize">
+                  {trashCycle === 'All'
+                    ? (language === 'so' ? 'Dhammaan Xilliyada (All Cycles)' : 'All Time')
+                    : `${trashCycle} · ${cycleLabel(trashCycle)}`}
+                </h3>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="inline-flex items-center bg-slate-50 dark:bg-slate-800/80 p-1.5 rounded-2xl border border-slate-200/80 dark:border-slate-700/80 shadow-inner">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (trashCycle === 'All') setTrashCycle(currentCycle());
+                    else setTrashCycle((prev) => addCycles(prev, -1));
+                  }}
+                  className="p-1.5 rounded-xl text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white hover:bg-white dark:hover:bg-slate-700 transition-all active:scale-95"
+                  title="Previous Cycle"
+                >
+                  <ChevronLeft size={16} strokeWidth={2.5} />
+                </button>
+
+                <select
+                  value={trashCycle}
+                  onChange={(e) => setTrashCycle(e.target.value)}
+                  className="bg-transparent px-3 py-1 font-black text-xs text-slate-800 dark:text-slate-100 cursor-pointer focus:outline-none"
+                >
+                  {trashCycleOptions.map((c) => (
+                    <option key={c.key} value={c.key} className="bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 font-bold">
+                      {c.label} {c.isCurrent ? `★ (${language === 'so' ? 'Bishan' : 'Current'})` : ''}
+                    </option>
+                  ))}
+                </select>
+
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (trashCycle === 'All') setTrashCycle(currentCycle());
+                    else setTrashCycle((prev) => addCycles(prev, 1));
+                  }}
+                  className="p-1.5 rounded-xl text-slate-600 hover:text-slate-900 dark:text-slate-300 dark:hover:text-white hover:bg-white dark:hover:bg-slate-700 transition-all active:scale-95"
+                  title="Next Cycle"
+                >
+                  <ChevronRight size={16} strokeWidth={2.5} />
+                </button>
+              </div>
+
+              {trashCycle !== 'All' && (
+                <button
+                  type="button"
+                  onClick={() => setTrashCycle('All')}
+                  className="flex items-center gap-1.5 px-3.5 py-2.5 rounded-2xl bg-rose-600 hover:bg-rose-700 text-white font-black text-xs uppercase tracking-wider shadow-sm transition-all active:scale-95"
+                  title="Back to all deleted records"
+                >
+                  <RotateCcw size={13} strokeWidth={2.5} />
+                  <span>{language === 'so' ? 'Dib u Noqo (Dhammaan)' : 'Back (All)'}</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -2389,7 +2637,7 @@ const CashbookManagement = () => {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100 dark:divide-slate-800">
-                  {deletedEntries.map((item) => {
+                  {filteredDeletedEntries.map((item) => {
                     const cat = item.categoryId;
                     const isIncome = cat?.type === 'Income';
 
@@ -2453,7 +2701,7 @@ const CashbookManagement = () => {
                       </tr>
                     );
                   })}
-                  {deletedEntries.length === 0 && (
+                  {filteredDeletedEntries.length === 0 && (
                     <tr>
                       <td colSpan={9} className="px-8 py-16 text-center text-slate-400 text-sm">
                         <div className="flex flex-col items-center justify-center gap-3">
@@ -2700,3 +2948,4 @@ const CashbookManagement = () => {
 };
 
 export default CashbookManagement;
+

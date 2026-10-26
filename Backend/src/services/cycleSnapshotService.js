@@ -26,8 +26,18 @@ const classDisplayName = (cls) => {
 const buildCyclePayers = async (cycleKey) => {
     const { end } = cycleRange(cycleKey);
     const students = await Student.find({
-        status: { $nin: ['Inactive', 'Exited'] },
-        registrationDate: { $lte: end }
+        $or: [
+            { status: { $nin: ['Inactive', 'Exited'] } },
+            { status: 'Exited', exitDate: { $gt: end } }
+        ],
+        $and: [
+            {
+                $or: [
+                    { registrationDate: { $lte: end } },
+                    { registrationDate: { $in: [null, undefined] }, createdAt: { $lte: end } }
+                ]
+            }
+        ]
     })
         .select('fullName fatherName fatherPhone guardianId monthlyFee fee classId registrationDate status studentCode feeHistory')
         .populate({ path: 'classId', select: 'name className branchId', populate: { path: 'branchId', select: 'name' } })
@@ -92,7 +102,7 @@ const buildCyclePayers = async (cycleKey) => {
         for (const s of g.students) {
             const paid = paidByStudent.get(String(s._id)) || 0;
             const fee = getStudentFeeForCycle(s, cycleKey);
-            paidAmount += paid;
+            paidAmount += Math.min(fee, paid);
             const remaining = Math.max(0, fee - paid);
             if (remaining > 0) {
                 debtStudentSet.add(String(s._id));
@@ -150,6 +160,7 @@ const buildCyclePayers = async (cycleKey) => {
  * Ensures a snapshot exists for a closed cycle.
  * If cycle has already ended, generates & stores CycleDebtSnapshot if not already present.
  */
+
 const ensureCycleSnapshot = async (cycleKey) => {
     if (!isValidCycleKey(cycleKey)) return null;
     const { end } = cycleRange(cycleKey);
@@ -157,9 +168,59 @@ const ensureCycleSnapshot = async (cycleKey) => {
     if (end > new Date()) return null;
 
     let snapshot = await CycleDebtSnapshot.findOne({ cycle: cycleKey }).lean();
-    if (snapshot) return snapshot;
+
+    // If a valid sealed snapshot exists with real expected data or payers, keep it immutable
+    // and ensure top-level totals strictly match the arithmetic sum of genuine payers
+    if (snapshot && Array.isArray(snapshot.payers) && snapshot.payers.length > 0) {
+        const sumFee = snapshot.payers.reduce((acc, p) => acc + (Number(p.totalFee) || 0), 0);
+        const sumPaid = snapshot.payers.reduce((acc, p) => acc + (Number(p.paidAmount) || 0), 0);
+        const sumDebt = snapshot.payers.reduce((acc, p) => acc + (p.paid ? 0 : (Number(p.remaining) || 0)), 0);
+        const payerDebtors = snapshot.payers.filter(p => (Number(p.remaining) || 0) > 0 && !p.paid).length;
+        if (snapshot.totalExpected !== sumFee || snapshot.totalDebt !== sumDebt || snapshot.totalCollected !== sumPaid) {
+            await CycleDebtSnapshot.updateOne(
+                { _id: snapshot._id },
+                {
+                    $set: {
+                        totalExpected: sumFee,
+                        totalCollected: sumPaid,
+                        totalDebt: sumDebt,
+                        payerCount: payerDebtors
+                    }
+                }
+            ).catch(() => {});
+            snapshot.totalExpected = sumFee;
+            snapshot.totalCollected = sumPaid;
+            snapshot.totalDebt = sumDebt;
+            snapshot.payerCount = payerDebtors;
+        }
+        return snapshot;
+    }
+    if (snapshot && snapshot.totalExpected > 0) {
+        return snapshot;
+    }
 
     const data = await buildCyclePayers(cycleKey);
+    if (snapshot) {
+        // If an empty dummy snapshot was previously saved before data existed, heal it
+        if (data.totalExpected > 0) {
+            await CycleDebtSnapshot.updateOne(
+                { _id: snapshot._id },
+                {
+                    $set: {
+                        totalDebt: data.totalDebt,
+                        totalExpected: data.totalExpected,
+                        totalCollected: data.totalCollected,
+                        payerCount: data.payerCount,
+                        studentCount: data.studentCount,
+                        payers: data.payers
+                    }
+                }
+            );
+            return await CycleDebtSnapshot.findById(snapshot._id).lean();
+        }
+        return snapshot;
+    }
+
     try {
         snapshot = await CycleDebtSnapshot.create({
             cycle: cycleKey,
@@ -181,26 +242,31 @@ const ensureCycleSnapshot = async (cycleKey) => {
 
 /**
  * Returns historical cycle debt KPI info for the dashboard.
- * Takes the previous cycle of currentCycle (or given cycle).
+ * - If viewing a cycle that has ALREADY closed (e.g. 2026-08):
+ *   it returns the frozen snapshot of that closed cycle itself!
+ * - If viewing the CURRENT active cycle (which has not ended yet):
+ *   it returns the frozen snapshot of the immediately preceding closed cycle.
  */
-const getHistoricalDebtKPI = async (current = currentCycle()) => {
-    const prev = previousCycle(current);
-    const { end } = cycleRange(prev);
+const getHistoricalDebtKPI = async (targetCycle = currentCycle()) => {
+    const isTargetClosed = cycleRange(targetCycle).end <= new Date();
+    const closedCycleKey = isTargetClosed ? targetCycle : previousCycle(targetCycle);
+
+    const { end } = cycleRange(closedCycleKey);
     if (end <= new Date()) {
-        const snapshot = await ensureCycleSnapshot(prev);
+        const snapshot = await ensureCycleSnapshot(closedCycleKey);
         if (snapshot) {
             return {
                 historicalCycleDebt: snapshot.totalDebt || 0,
-                historicalCycle: prev,
-                historicalCycleLabel: snapshot.cycleLabel || cycleLabel(prev),
+                historicalCycle: closedCycleKey,
+                historicalCycleLabel: snapshot.cycleLabel || cycleLabel(closedCycleKey),
                 historicalPayerCount: snapshot.payerCount || 0
             };
         }
     }
     return {
         historicalCycleDebt: 0,
-        historicalCycle: prev,
-        historicalCycleLabel: cycleLabel(prev),
+        historicalCycle: closedCycleKey,
+        historicalCycleLabel: cycleLabel(closedCycleKey),
         historicalPayerCount: 0
     };
 };

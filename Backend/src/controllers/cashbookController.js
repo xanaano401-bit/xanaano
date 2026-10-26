@@ -18,6 +18,7 @@ const { getStudentFeeForCycle } = require('../utils/studentFee');
 const { ensureCycleSnapshot } = require('../services/cycleSnapshotService');
 const CycleLock = require('../models/CycleLock');
 const { canManageCycleLocks } = require('./cycleLockController');
+const { logAudit } = require('../utils/auditLogger');
 
 // The wallet is populated alongside the category so reports can name the
 // institute side of a transaction: it is the sender on an expense and the
@@ -216,7 +217,19 @@ const getEntries = asyncHandler(async (req, res) => {
 });
 
 const getDeletedEntries = asyncHandler(async (req, res) => {
-    const data = await CashbookEntry.find({ isDeleted: true })
+    const { cycle } = req.query;
+    const query = { isDeleted: true };
+    if (cycle && cycle !== 'All') {
+        const { start, end } = cycleRange(cycle);
+        const startISO = start.toISOString().slice(0, 10);
+        const endISO = end.toISOString().slice(0, 10);
+        query.$or = [
+            { targetMonth: cycle },
+            { date: { $gte: startISO, $lte: endISO } },
+            { deletedAt: { $gte: start, $lte: end } }
+        ];
+    }
+    const data = await CashbookEntry.find(query)
         .populate(populateEntry)
         .sort({ deletedAt: -1, date: -1 });
     res.json(data);
@@ -394,6 +407,7 @@ const createEntry = asyncHandler(async (req, res) => {
                             paymentMethod: data.method || 'Cash',
                             paymentDate: new Date(data.date || Date.now()),
                             status: 'Paid',
+                            sourceEntryId: data._id,
                             notes: `Cashbook: ${category.title} (${selectedMonth}${isAdvance ? ' · Hormarin' : ''}) · ref:${data._id}${data.description ? ` · ${data.description}` : ''}`,
                             paidBy: req.user?._id
                         });
@@ -413,6 +427,7 @@ const createEntry = asyncHandler(async (req, res) => {
 
                     const entryDocs = await CashbookEntry.find({
                         _id: { $ne: data._id },
+                        isDeleted: { $ne: true },
                         $and: [
                             {
                                 $or: [
@@ -443,6 +458,7 @@ const createEntry = asyncHandler(async (req, res) => {
 
                 const prevEntry = await CashbookEntry.findOne({
                     _id: { $ne: data._id },
+                    isDeleted: { $ne: true },
                     receiverPhone: data.receiverPhone,
                     feeRemaining: { $ne: null },
                     ...entryInCycle(selectedMonth)
@@ -571,6 +587,18 @@ const updateEntry = asyncHandler(async (req, res) => {
         }
     );
 
+    // Keep any mirrored salary records in sync with the edited entry.
+    await Salary.updateMany(
+        { $or: [{ sourceEntryId: data._id }, { notes: new RegExp(String(data._id)) }] },
+        {
+            walletId: newWallet?._id,
+            amount: data.amount,
+            paymentDate: new Date(data.date || Date.now()),
+            month: newCycle,
+            billingCycle: newCycle
+        }
+    );
+
     // Re-sync linked fee payments against the updated amount / category / date.
     const feeRemaining = await syncFeePayments(data, newCategory, req.user?._id);
     data.feeRemaining = feeRemaining ?? null;
@@ -602,7 +630,12 @@ const deleteEntry = asyncHandler(async (req, res) => {
     await Transaction.deleteMany({ referenceId: existing._id });
     // Remove any student fee payments or salary disbursements recorded from this entry.
     await Payment.deleteMany({ sourceEntryId: existing._id });
-    await Salary.deleteMany({ notes: new RegExp(existing._id) });
+    await Salary.deleteMany({
+        $or: [
+            { sourceEntryId: existing._id },
+            { notes: new RegExp(String(existing._id)) }
+        ]
+    });
 
     // Mark as soft deleted instead of destroying from database
     existing.isDeleted = true;
@@ -611,6 +644,15 @@ const deleteEntry = asyncHandler(async (req, res) => {
     existing.deletedByName = req.user?.fullName || req.user?.name || 'Administrator';
     existing.deletedByRole = req.user?.role || 'Admin';
     await existing.save();
+
+    await logAudit({
+        req,
+        action: 'DELETE',
+        entityType: 'CashbookEntry',
+        entityId: existing._id,
+        entityName: `${existing.category || 'Transaction'}: $${existing.amount} (${existing.description || ''})`,
+        snapshot: existing.toObject ? existing.toObject() : existing
+    });
 
     res.json({ message: 'Transaction moved to trash', data: existing });
 });
@@ -650,6 +692,33 @@ const restoreEntry = asyncHandler(async (req, res) => {
     // Re-sync fee payments if it was a student fee payment
     const feeRemaining = await syncFeePayments(existing, category, req.user?._id);
     existing.feeRemaining = feeRemaining ?? null;
+
+    // Re-sync salary mirror if it was a teacher or staff salary payment
+    if (existing.receiverEntityId && ['teacher', 'user'].includes(existing.receiverEntityType)) {
+        const user = await User.findById(existing.receiverEntityId).select('salary');
+        const totalSalary = Number(user?.salary || 0);
+        if (totalSalary > 0) {
+            const selectedMonth = existing.targetMonth || cycleKeyForDate(existing.date);
+            const isAdvance = selectedMonth > currentCycle();
+            try {
+                await Salary.create({
+                    teacherId: existing.receiverEntityId,
+                    walletId: wallet?._id,
+                    month: selectedMonth,
+                    billingCycle: selectedMonth,
+                    amount: existing.amount,
+                    paymentMethod: existing.method || 'Cash',
+                    paymentDate: new Date(existing.date || Date.now()),
+                    status: 'Paid',
+                    sourceEntryId: existing._id,
+                    notes: `Cashbook: ${category?.title || 'Salary'} (${selectedMonth}${isAdvance ? ' · Hormarin' : ''}) · ref:${existing._id}${existing.description ? ` · ${existing.description}` : ''}`,
+                    paidBy: req.user?._id
+                });
+            } catch (e) {
+                console.error('Salary restore sync note:', e.message);
+            }
+        }
+    }
 
     // Reset soft delete flags
     existing.isDeleted = false;
@@ -759,6 +828,7 @@ const entryInCycle = (cycle) => {
     const endISO = end.toISOString().slice(0, 10);
     const dateMonth = { $substr: [{ $ifNull: ['$date', ''] }, 0, 7] };
     return {
+        isDeleted: { $ne: true },
         $or: [
             // (a) plain / historical / same-cycle entries → attribute by real date
             {
@@ -832,7 +902,13 @@ const buildPayerInfo = async (match, variants, purpose = 'sender', reqDate = nul
     const currentMonth = isValidCycleKey(reqDate) ? reqDate : cycleKeyForDate(reqDate || new Date());
 
     // 1. Guardian / responsible / student's father → gather all students under them.
+    // ONLY when purpose is 'sender' (a payer depositing tuition fees to the institute).
+    // If purpose is 'receiver' (institute sending money/expense to this guardian),
+    // they are a receiver/contact, NOT a tuition fee payer.
     if (match.entityType === 'guardian' || match.entityType === 'student') {
+        if (purpose === 'receiver') {
+            return null;
+        }
         const orConds = [];
         if (match.entityType === 'guardian' && match.entityId) {
             orConds.push({ guardianId: match.entityId });
@@ -909,6 +985,7 @@ const buildPayerInfo = async (match, variants, purpose = 'sender', reqDate = nul
 
         // Cashbook expense entries to THIS receiver within this billing cycle.
         const entryConditions = [
+            { isDeleted: { $ne: true } },
             { $or: [
                 { receiverEntityId: match.entityId },
                 phoneOrQuery('receiverPhone', variants)
@@ -946,6 +1023,7 @@ const buildPayerInfo = async (match, variants, purpose = 'sender', reqDate = nul
 
         // If user has no salary, check previous CashbookEntry snapshots
         const lastEntry = await CashbookEntry.findOne({
+            isDeleted: { $ne: true },
             $or: [
                 { receiverEntityId: match.entityId },
                 phoneOrQuery('receiverPhone', variants)
@@ -980,7 +1058,7 @@ const buildPayerInfo = async (match, variants, purpose = 'sender', reqDate = nul
             ? phoneOrQuery('receiverPhone', variants)
             : phoneOrQuery('senderPhone', variants);
 
-        const monthQuery = { $and: [phoneQuery, entryInCycle(currentMonth)] };
+        const monthQuery = { $and: [{ isDeleted: { $ne: true } }, phoneQuery, entryInCycle(currentMonth)] };
         const monthEntries = await CashbookEntry.find(monthQuery).populate('categoryId');
         const paidThisMonth = monthEntries
             .filter((e) => !e.categoryId || (purpose === 'receiver' ? e.categoryId.type === 'Expense' : e.categoryId.type === 'Income'))
@@ -991,7 +1069,7 @@ const buildPayerInfo = async (match, variants, purpose = 'sender', reqDate = nul
         if (baseBalance > 0) {
             rem = Math.max(0, baseBalance - paidThisMonth);
         } else {
-            const lastEntry = await CashbookEntry.findOne(phoneQuery).sort({ date: -1, createdAt: -1 });
+            const lastEntry = await CashbookEntry.findOne({ isDeleted: { $ne: true }, ...phoneQuery }).sort({ date: -1, createdAt: -1 });
             if (lastEntry && lastEntry.feeRemaining !== null && lastEntry.feeRemaining !== undefined) {
                 rem = Math.max(0, Number(lastEntry.feeRemaining) - paidThisMonth);
             }
@@ -1013,13 +1091,13 @@ const buildPayerInfo = async (match, variants, purpose = 'sender', reqDate = nul
         ? phoneOrQuery('receiverPhone', variants)
         : phoneOrQuery('senderPhone', variants);
 
-    const monthQuery = { $and: [phoneQuery, entryInCycle(currentMonth)] };
+    const monthQuery = { $and: [{ isDeleted: { $ne: true } }, phoneQuery, entryInCycle(currentMonth)] };
     const monthEntries = await CashbookEntry.find(monthQuery).populate('categoryId');
     const paidThisMonth = monthEntries
         .filter((e) => !e.categoryId || (purpose === 'receiver' ? e.categoryId.type === 'Expense' : e.categoryId.type === 'Income'))
         .reduce((sum, e) => sum + (Number(e.amount) || 0), 0);
 
-    const lastEntry = match.lastEntry || await CashbookEntry.findOne(phoneQuery).sort({ date: -1, createdAt: -1 });
+    const lastEntry = match.lastEntry || await CashbookEntry.findOne({ isDeleted: { $ne: true }, ...phoneQuery }).sort({ date: -1, createdAt: -1 });
     if (lastEntry) {
         let base = 0;
         if (lastEntry.amount && Number(lastEntry.amount) > 0) {
@@ -1063,9 +1141,7 @@ const lookupPhone = asyncHandler(async (req, res) => {
             ? [
                   () => lookupUser(variants, true),
                   () => lookupUser(variants, false),
-                  () => lookupAccount(variants),
-                  () => lookupGuardian(variants),
-                  () => lookupStudent(variants)
+                  () => lookupAccount(variants)
               ]
             : [
                   () => lookupGuardian(variants),
@@ -1094,11 +1170,25 @@ const lookupPhone = asyncHandler(async (req, res) => {
 // Active (non-Inactive/Exited) students and how much each has paid within a
 // billing cycle. registrationBound=true applies the Monthly-Payments rule: a
 // student counts once registered by the cycle's END (its 24th).
+const activeInCycleCondition = (cycleEnd) => ({
+    $or: [
+        { status: { $nin: ['Inactive', 'Exited'] } },
+        { status: 'Exited', exitDate: { $gt: cycleEnd } }
+    ]
+});
+
 const fetchStudentFeeData = async (cycle, { registrationBound = true } = {}) => {
     const { end } = cycleRange(cycle);
-    const studentQuery = { status: { $nin: ['Inactive', 'Exited'] } };
+    const studentQuery = { ...activeInCycleCondition(end) };
     if (registrationBound) {
-        studentQuery.registrationDate = { $lte: end };
+        studentQuery.$and = [
+            {
+                $or: [
+                    { registrationDate: { $lte: end } },
+                    { registrationDate: { $in: [null, undefined] }, createdAt: { $lte: end } }
+                ]
+            }
+        ];
     }
 
     const students = await Student.find(studentQuery)
@@ -1134,6 +1224,17 @@ const fetchStudentFeeData = async (cycle, { registrationBound = true } = {}) => 
 // This is exactly the calculation Monthly Payments performs, so the Dashboard's
 // "Student Fees Collected" and "Pending Student Fees" match that report.
 const computeFeeTotals = async (cycle = currentCycle()) => {
+    if (cycle < currentCycle()) {
+        const snapshot = await ensureCycleSnapshot(cycle);
+        if (snapshot && snapshot.totalExpected > 0) {
+            return {
+                cycle,
+                expected: snapshot.totalExpected,
+                collected: snapshot.totalCollected,
+                pending: snapshot.totalDebt
+            };
+        }
+    }
     const { students, paidByStudent } = await fetchStudentFeeData(cycle, { registrationBound: true });
     let expected = 0;
     let collected = 0;
@@ -1142,7 +1243,7 @@ const computeFeeTotals = async (cycle = currentCycle()) => {
         const fee = getStudentFeeForCycle(s, cycle);
         const paid = paidByStudent.get(String(s._id)) || 0;
         expected += fee;
-        collected += paid;
+        collected += Math.min(fee, paid);
         pending += Math.max(0, fee - paid);
     }
     return { cycle, expected, collected, pending };
@@ -1175,7 +1276,7 @@ const computePreviousDebt = async (cycle = currentCycle(), { studentIds = null, 
 
     const { end: lastEnd } = cycleRange(addCycles(cycle, -1));
     const studentQuery = {
-        status: { $nin: ['Inactive', 'Exited'] },
+        ...activeInCycleCondition(lastEnd),
         registrationDate: { $lte: lastEnd }
     };
     if (studentIds) studentQuery._id = { $in: studentIds };
@@ -1227,7 +1328,7 @@ const getPreviousDebtPayers = async (cycle = currentCycle()) => {
 
     const { end: lastEnd } = cycleRange(addCycles(cycle, -1));
     const studentQuery = {
-        status: { $nin: ['Inactive', 'Exited'] },
+        ...activeInCycleCondition(lastEnd),
         registrationDate: { $lte: lastEnd }
     };
     const students = await Student.find(studentQuery)
@@ -1433,6 +1534,82 @@ const financeCardDetail = async (cardKey, cycle = currentCycle()) => {
         // 2. Total Income / 4. Total Expenses — the Transaction ledger, the single
         // source of truth, filtered by type + date within the current cycle (same
         // filter as totalIncomeAgg / totalExpensesAgg). Institute-wide.
+        // Debt Fees Collected — payments completed in this cycle paying for earlier cycles
+        case 'debtFeesCollected': {
+            const { start, end } = cycleRange(cycle);
+            const payments = await Payment.find({
+                status: 'Completed',
+                $or: [
+                    { paymentDate: { $gte: start, $lte: end } },
+                    { paymentDate: null, createdAt: { $gte: start, $lte: end } }
+                ],
+                billingCycle: { $nin: [null, ''], $lt: cycle }
+            }).populate({ path: 'studentId', select: 'fullName studentCode fatherName guardianId', populate: { path: 'guardianId', select: 'fullName' } }).sort({ paymentDate: 1 }).lean();
+
+            const rows = payments.map((p) => {
+                const s = p.studentId;
+                return {
+                    studentName: s?.fullName || '—',
+                    studentId: s?.studentCode || String(s?._id || p.studentId || '—'),
+                    payer: payerNameOf(s) || p.description || '—',
+                    amount: num(p.amount),
+                    paymentDate: p.paymentDate || p.createdAt || null,
+                    billingCycle: p.billingCycle
+                };
+            });
+            return {
+                title: 'Debt Fees Collected',
+                columns: [
+                    { key: 'studentName', label: 'Student Name' },
+                    { key: 'studentId', label: 'Student ID' },
+                    { key: 'payer', label: 'Payer' },
+                    { key: 'billingCycle', label: 'Debt Cycle Paid' },
+                    { key: 'amount', label: 'Amount', money: true },
+                    { key: 'paymentDate', label: 'Payment Date', date: true }
+                ],
+                rows,
+                total: sumRows(rows)
+            };
+        }
+
+        // Advance Fees Collected — payments completed in this cycle paying for upcoming cycles
+        case 'advanceFeesCollected': {
+            const { start, end } = cycleRange(cycle);
+            const payments = await Payment.find({
+                status: 'Completed',
+                $or: [
+                    { paymentDate: { $gte: start, $lte: end } },
+                    { paymentDate: null, createdAt: { $gte: start, $lte: end } }
+                ],
+                billingCycle: { $nin: [null, ''], $gt: cycle }
+            }).populate({ path: 'studentId', select: 'fullName studentCode fatherName guardianId', populate: { path: 'guardianId', select: 'fullName' } }).sort({ paymentDate: 1 }).lean();
+
+            const rows = payments.map((p) => {
+                const s = p.studentId;
+                return {
+                    studentName: s?.fullName || '—',
+                    studentId: s?.studentCode || String(s?._id || p.studentId || '—'),
+                    payer: payerNameOf(s) || p.description || '—',
+                    amount: num(p.amount),
+                    paymentDate: p.paymentDate || p.createdAt || null,
+                    billingCycle: p.billingCycle
+                };
+            });
+            return {
+                title: 'Advance Fees Collected',
+                columns: [
+                    { key: 'studentName', label: 'Student Name' },
+                    { key: 'studentId', label: 'Student ID' },
+                    { key: 'payer', label: 'Payer' },
+                    { key: 'billingCycle', label: 'Advance Cycle' },
+                    { key: 'amount', label: 'Amount', money: true },
+                    { key: 'paymentDate', label: 'Payment Date', date: true }
+                ],
+                rows,
+                total: sumRows(rows)
+            };
+        }
+
         case 'totalIncome':
         case 'totalExpenses': {
             const isIncome = cardKey === 'totalIncome';
@@ -1497,7 +1674,8 @@ const getPayers = asyncHandler(async (req, res) => {
     if (requestedCycle && requestedCycle < currentCycle()) {
         const snapshot = await ensureCycleSnapshot(requestedCycle);
         if (snapshot && Array.isArray(snapshot.payers) && snapshot.payers.length > 0) {
-            return res.json(snapshot.payers);
+            const cleanPayers = snapshot.payers.filter(p => !p.key?.startsWith('cashbook_direct_tuition'));
+            return res.json(cleanPayers);
         }
     }
 

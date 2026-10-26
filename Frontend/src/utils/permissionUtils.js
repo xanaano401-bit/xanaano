@@ -85,6 +85,86 @@ export const roleHasPermission = (role, moduleName, action = 'Read', subModuleNa
 };
 
 export const userHasPermission = (user, moduleName, action = 'Read', subModuleName = null) => {
-  if (!user?.roles || user.roles.length === 0) return false;
-  return user.roles.some(role => roleHasPermission(role, moduleName, action, subModuleName));
+  if (!user) return false;
+
+  // 1. Direct customPermissions attached to the user account
+  if (user.customPermissions && typeof user.customPermissions === 'object' && Object.keys(user.customPermissions).length > 0) {
+    if (roleHasPermission({ permissions: user.customPermissions }, moduleName, action, subModuleName)) {
+      return true;
+    }
+  }
+
+  // 2. Roles assigned to the user
+  if (user.roles && Array.isArray(user.roles) && user.roles.length > 0) {
+    return user.roles.some(role => roleHasPermission(role, moduleName, action, subModuleName));
+  }
+
+  return false;
+};
+
+export const hasNavPermission = (user, currentRole, moduleLabel, subModuleLabel = null, navConfig = null) => {
+  if (!user) return false;
+
+  const roleNormalized = typeof currentRole === 'string' ? currentRole.toLowerCase() : '';
+  const isSuperOrAdmin = roleNormalized.includes('super') ||
+                         roleNormalized.includes('owner') ||
+                         roleNormalized.includes('system') ||
+                         roleNormalized === 'institute admin' ||
+                         roleNormalized === 'institute_admin';
+
+  if (isSuperOrAdmin) return true;
+
+  // If the user has specific assigned roles (e.g. IMTIXAAN) or customPermissions,
+  // custom permissions strictly govern their access!
+  const hasCustomRoles = (user.roles && Array.isArray(user.roles) && user.roles.length > 0) ||
+                         (user.customPermissions && Object.keys(user.customPermissions).length > 0);
+
+  if (hasCustomRoles) {
+    return userHasPermission(user, moduleLabel, 'Read', subModuleLabel);
+  }
+
+  // Fallback to built-in role defaults in navConfig
+  if (Array.isArray(navConfig)) {
+    const navItem = navConfig.find(item => item.label === moduleLabel);
+    if (navItem && Array.isArray(navItem.roles)) {
+      const roleUpper = currentRole ? currentRole.toUpperCase().replace(/\s+/g, '_') : '';
+      const match = navItem.roles.some(r => {
+        const rUpper = String(r).toUpperCase().replace(/\s+/g, '_');
+        return rUpper === roleUpper || rUpper === roleNormalized.toUpperCase();
+      });
+      if (match) return true;
+    }
+  }
+
+  return false;
+};
+
+export const getDefaultLandingPath = (user, currentRole, navConfig = []) => {
+  if (!user) return '/';
+
+  // If user is permitted on Dashboard, land on '/'
+  if (hasNavPermission(user, currentRole, 'Dashboard', null, navConfig)) {
+    return '/';
+  }
+
+  // Otherwise find the first allowed module and its first allowed sub-route
+  if (Array.isArray(navConfig)) {
+    for (const item of navConfig) {
+      if (item.label === 'Dashboard') continue;
+
+      if (item.subItems && item.subItems.length > 0) {
+        for (const sub of item.subItems) {
+          if (hasNavPermission(user, currentRole, item.label, sub.label, navConfig)) {
+            return sub.path;
+          }
+        }
+      } else {
+        if (hasNavPermission(user, currentRole, item.label, null, navConfig)) {
+          return item.path;
+        }
+      }
+    }
+  }
+
+  return '/';
 };
