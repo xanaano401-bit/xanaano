@@ -176,6 +176,18 @@ const MonthlyPayments = () => {
     });
   }, [statusFiltered, search]);
 
+  const filteredCollected = useMemo(() => {
+    return filtered.reduce((sum, p) => sum + Number(p.paidAmount || 0), 0);
+  }, [filtered]);
+
+  const filteredPending = useMemo(() => {
+    return filtered.reduce((sum, p) => sum + Number(p.remaining !== undefined ? p.remaining : Math.max(0, (p.totalFee || 0) - (p.paidAmount || 0))), 0);
+  }, [filtered]);
+
+  const filteredExpected = useMemo(() => {
+    return filtered.reduce((sum, p) => sum + Number(p.totalFee || 0), 0);
+  }, [filtered]);
+
   // Comprehensive aggregate stats
   const totals = useMemo(() => {
     let expected = 0;
@@ -863,16 +875,20 @@ const MonthlyPayments = () => {
               {filtered.length > 0 && (
                 <tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-50/75 dark:bg-slate-800/50 font-black">
                   <td colSpan={4} className="px-5 py-3.5 text-right uppercase text-xs tracking-wider text-slate-500 dark:text-slate-400 print:text-black print:px-1.5 print:py-0.5 print:text-[8pt]">
-                    {t('common.total')}:
+                    {statusFilter === 'paid'
+                      ? `${t('monthlyPayments.footerCollected')}:`
+                      : statusFilter === 'pending' || isPreviousDebtView
+                        ? `${t('monthlyPayments.pending')}:`
+                        : `${t('common.total')}:`}
                   </td>
                   <td className="px-5 py-3.5 text-right text-xs font-black text-slate-900 dark:text-white tabular-nums print:text-black print:px-1.5 print:py-0.5 print:text-[8pt]">
-                    ${fmtMoney(filtered.reduce((sum, p) => sum + Number(p.totalFee || 0), 0))}
+                    {statusFilter === 'paid' ? `$${fmtMoney(filteredCollected)}` : statusFilter === 'pending' || isPreviousDebtView ? '—' : `$${fmtMoney(filteredExpected)}`}
                   </td>
                   <td className="px-5 py-3.5 text-right text-xs font-black text-emerald-600 dark:text-emerald-400 tabular-nums print:text-black print:px-1.5 print:py-0.5 print:text-[8pt]">
-                    ${fmtMoney(filtered.reduce((sum, p) => sum + Number(p.paidAmount || 0), 0))}
+                    {statusFilter === 'pending' || isPreviousDebtView ? '—' : `$${fmtMoney(filteredCollected)}`}
                   </td>
                   <td className="px-5 py-3.5 text-right text-xs font-black text-rose-600 dark:text-rose-400 tabular-nums print:text-black print:px-1.5 print:py-0.5 print:text-[8pt]">
-                    ${fmtMoney(filtered.reduce((sum, p) => sum + Number(p.remaining !== undefined ? p.remaining : Math.max(0, p.totalFee - (p.paidAmount || 0))), 0))}
+                    {statusFilter === 'paid' ? '$0.00' : `$${fmtMoney(filteredPending)}`}
                   </td>
                   <td className="px-5 py-3.5 text-center print:hidden"></td>
                 </tr>
@@ -898,24 +914,52 @@ const MonthlyPayments = () => {
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-6">
-          <div className="text-right">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('monthlyPayments.colFee') || t('common.total')}</p>
-            <p className="text-2xl font-black text-slate-900 dark:text-white leading-none tabular-nums">
-              ${fmtMoney(filtered.reduce((sum, p) => sum + Number(p.totalFee || 0), 0))}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">{t('monthlyPayments.footerCollected')}</p>
-            <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 leading-none tabular-nums">
-              ${fmtMoney(filtered.reduce((sum, p) => sum + Number(p.paidAmount || 0), 0))}
-            </p>
-          </div>
-          <div className="text-right">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">{t('monthlyPayments.pending')}</p>
-            <p className="text-2xl font-black text-rose-600 dark:text-rose-400 leading-none tabular-nums">
-              ${fmtMoney(filtered.reduce((sum, p) => sum + Number(p.remaining !== undefined ? p.remaining : Math.max(0, p.totalFee - (p.paidAmount || 0))), 0))}
-            </p>
-          </div>
+          {statusFilter === 'paid' ? (
+            <div className="text-right">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                {t('monthlyPayments.footerCollected')}
+              </p>
+              <p className="text-3xl font-black text-emerald-600 dark:text-emerald-400 leading-none tabular-nums">
+                ${fmtMoney(filteredCollected)}
+              </p>
+            </div>
+          ) : statusFilter === 'pending' || isPreviousDebtView ? (
+            <div className="text-right">
+              <p className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
+                {t('monthlyPayments.pending')}
+              </p>
+              <p className="text-3xl font-black text-rose-600 dark:text-rose-400 leading-none tabular-nums">
+                ${fmtMoney(filteredPending)}
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="text-right">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                  {t('monthlyPayments.totalDue')}
+                </p>
+                <p className="text-2xl font-black text-slate-900 dark:text-white leading-none tabular-nums">
+                  ${fmtMoney(filteredExpected)}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
+                  {t('monthlyPayments.footerCollected')}
+                </p>
+                <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 leading-none tabular-nums">
+                  ${fmtMoney(filteredCollected)}
+                </p>
+              </div>
+              <div className="text-right">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
+                  {t('monthlyPayments.pending')}
+                </p>
+                <p className="text-2xl font-black text-rose-600 dark:text-rose-400 leading-none tabular-nums">
+                  ${fmtMoney(filteredPending)}
+                </p>
+              </div>
+            </>
+          )}
         </div>
       </div>
     </div>
