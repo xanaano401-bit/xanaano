@@ -232,7 +232,7 @@ const DashboardOverview = () => {
             icon: <DollarSign size={20} />,
             color: 'bg-blue-600',
             badgeColor: 'bg-blue-50 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
-            path: `/finance/monthly-payments?month=${cycle}`,
+            path: `/finance/monthly-payments?month=${cycle}&status=all`,
             description: `${cycle} · ${billingCycleName}`,
             explanationVars: { cycle: `${cycle} (${billingCycleName})` },
             statValue: `${money(kpis.studentFeesCollected)} / ${money(kpis.pendingStudentFees)}`
@@ -274,7 +274,7 @@ const DashboardOverview = () => {
             icon: <RotateCcw size={20} />,
             color: 'bg-amber-600',
             badgeColor: 'bg-amber-50 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300',
-            path: `/finance/monthly-payments?view=previousDebt&month=previous`,
+            path: `/finance/cashbook?month=${cycle}&category=fee`,
             description: `${cycle} · ${billingCycleName}`,
             explanationVars: { cycle: `${cycle} (${billingCycleName})` },
             statValue: money(kpis.previousDebt)
@@ -347,7 +347,7 @@ const DashboardOverview = () => {
             icon: <AlertCircle size={20} />,
             color: 'bg-red-600',
             badgeColor: 'bg-red-50 text-red-700 dark:bg-red-950/50 dark:text-red-300',
-            path: `/finance/monthly-payments?view=previousDebt&month=previous`,
+            path: `/finance/monthly-payments?view=previousDebt&cycle=${cycle}&status=pending`,
             description: cardText('previousDebt', 'description', { cycle: `${cycle} (${billingCycleName})` }),
             explanationVars: { cycle: `${cycle} (${billingCycleName})` },
             statValue: previousCycleName

@@ -74,12 +74,15 @@ const MonthlyPayments = () => {
   const viewParam = searchParams.get('view');
   const isPreviousDebtView = viewParam === 'previousDebt';
 
-  // Open on the requested URL ?month=YYYY-MM or CURRENT 25→24 billing cycle
+  // Open on the requested URL ?month=YYYY-MM or ?cycle=YYYY-MM or CURRENT 25→24 billing cycle
   const initialMonthParam = searchParams.get('month');
-  const [initYear, initMonth] = (initialMonthParam && /^\d{4}-\d{2}$/.test(initialMonthParam)
+  const initialCycleParam = searchParams.get('cycle');
+  const effectiveInitialCycle = (initialMonthParam && /^\d{4}-\d{2}$/.test(initialMonthParam))
     ? initialMonthParam
-    : currentCycle()
-  ).split('-').map(Number);
+    : ((initialCycleParam && /^\d{4}-\d{2}$/.test(initialCycleParam))
+      ? initialCycleParam
+      : currentCycle());
+  const [initYear, initMonth] = effectiveInitialCycle.split('-').map(Number);
   const [year, setYear] = useState(initYear);
   const [month, setMonth] = useState(initMonth - 1); // 0-11
 
@@ -87,7 +90,7 @@ const MonthlyPayments = () => {
   useEffect(() => {
     const s = searchParams.get('status') || searchParams.get('filter') || 'all';
     setStatusFilter(s);
-    const m = searchParams.get('month');
+    const m = searchParams.get('month') || searchParams.get('cycle');
     if (m && /^\d{4}-\d{2}$/.test(m)) {
       const [y, mon] = m.split('-').map(Number);
       setYear(y);
@@ -110,8 +113,9 @@ const MonthlyPayments = () => {
     try {
       setLoading(true);
       setError(null);
+      const targetCycle = searchParams.get('cycle') || monthKey;
       const params = isPreviousDebtView
-        ? { view: 'previousDebt' }
+        ? { view: 'previousDebt', cycle: targetCycle }
         : { month: monthKey, view: viewParam || undefined };
       const { data } = await api.get('/cashbook/payers', { params });
       const rawPayers = Array.isArray(data) ? data : (data?.payers || []);
@@ -129,10 +133,17 @@ const MonthlyPayments = () => {
 
   useEffect(() => {
     fetchPayers();
-  }, [monthKey, isPreviousDebtView, viewParam]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [monthKey, isPreviousDebtView, viewParam, searchParams.get('cycle')]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Status filter logic
   const statusFiltered = useMemo(() => {
+    if (isPreviousDebtView) {
+      // In previous debt view, strictly ONLY payers who have remaining unpaid debt
+      return payers.filter((p) => {
+        const remaining = Number(p.remaining !== undefined ? p.remaining : (p.totalFee - (p.paidAmount || 0)));
+        return remaining > 0 && !p.paid;
+      });
+    }
     if (statusFilter === 'paid') {
       // ONLY payers who actually paid money for this cycle (paidAmount > 0)
       return payers.filter((p) => Number(p.paidAmount || 0) > 0);
@@ -145,7 +156,7 @@ const MonthlyPayments = () => {
       });
     }
     return payers;
-  }, [payers, statusFilter]);
+  }, [payers, statusFilter, isPreviousDebtView]);
 
   // Search filter applied on top of status filter
   const filtered = useMemo(() => {
@@ -192,11 +203,11 @@ const MonthlyPayments = () => {
     });
 
     return {
-      expected,
-      collected,
+      expected: isPreviousDebtView ? pending : expected,
+      collected: isPreviousDebtView ? 0 : collected,
       pending,
-      paidPayersCount,
-      pendingPayersCount,
+      paidPayersCount: isPreviousDebtView ? 0 : paidPayersCount,
+      pendingPayersCount: isPreviousDebtView ? payers.length : pendingPayersCount,
       studentsCount
     };
   }, [payers, monthKey, isPreviousDebtView]);
@@ -416,6 +427,7 @@ const MonthlyPayments = () => {
               onClick={() => {
                 const nextParams = new URLSearchParams(searchParams);
                 nextParams.delete('view');
+                nextParams.delete('cycle');
                 nextParams.set('month', currentCycle());
                 setSearchParams(nextParams);
               }}
@@ -438,8 +450,12 @@ const MonthlyPayments = () => {
                 setYear(Number(y));
                 setMonth(Number(m) - 1);
                 const nextParams = new URLSearchParams(searchParams);
-                nextParams.delete('view');
-                nextParams.set('month', e.target.value);
+                if (isPreviousDebtView) {
+                  nextParams.set('cycle', e.target.value);
+                  nextParams.delete('month');
+                } else {
+                  nextParams.set('month', e.target.value);
+                }
                 setSearchParams(nextParams);
               }}
               className="w-full min-w-0 bg-transparent outline-none text-xs font-bold text-slate-900 dark:text-white cursor-pointer"

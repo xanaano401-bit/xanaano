@@ -1369,7 +1369,8 @@ const getPreviousDebtPayers = async (cycle = currentCycle()) => {
             studentTotalOwed += owed;
         }
 
-        if (studentTotalFee <= 0) continue;
+        // STRICT CHECK: ONLY students who actually owe money in previous cycles
+        if (studentTotalOwed <= 0) continue;
 
         const guardian = s.guardianId && typeof s.guardianId === 'object' ? s.guardianId : null;
         const payerName = guardian?.fullName || s.fatherName || '';
@@ -1399,13 +1400,13 @@ const getPreviousDebtPayers = async (cycle = currentCycle()) => {
             name: s.fullName,
             studentCode: s.studentCode || '',
             className: classDisplayName(s.classId),
-            monthlyFee: studentTotalFee,
-            paid: studentTotalPaid,
+            monthlyFee: studentTotalOwed,
+            paid: 0,
             remaining: studentTotalOwed,
-            isPaid: studentTotalFee > 0 && studentTotalPaid >= studentTotalFee
+            isPaid: false
         });
-        g.totalFee += studentTotalFee;
-        g.paidAmount += studentTotalPaid;
+        g.totalFee += studentTotalOwed;
+        g.paidAmount += 0;
         g.remaining += studentTotalOwed;
         if (!g.name && payerName) g.name = payerName;
         if (!g.phone && payerPhone) g.phone = payerPhone;
@@ -1415,7 +1416,7 @@ const getPreviousDebtPayers = async (cycle = currentCycle()) => {
 
     const result = [];
     for (const g of groups.values()) {
-        const isPaid = g.totalFee > 0 && g.paidAmount >= g.totalFee;
+        if (g.remaining <= 0) continue;
         result.push({
             key: g.key,
             name: g.name || 'Unknown',
@@ -1426,10 +1427,10 @@ const getPreviousDebtPayers = async (cycle = currentCycle()) => {
             studentIds: g.students.map((s) => s.studentId),
             students: g.students,
             studentCount: g.students.length,
-            totalFee: g.totalFee,
-            paidAmount: g.paidAmount,
+            totalFee: g.remaining,
+            paidAmount: 0,
             remaining: g.remaining,
-            paid: isPaid,
+            paid: false,
             month: 'previous',
             cycle: `before-${cycle}`,
             isPreviousDebt: true
@@ -1657,10 +1658,13 @@ const financeCardDetail = async (cardKey, cycle = currentCycle()) => {
 // One row per responsible payer (father / guardian): name, number, how many
 // students they cover, the total monthly fee, and whether it's fully paid this month.
 const getPayers = asyncHandler(async (req, res) => {
-    // 1. Live Previous Debt view: all unpaid arrears from cycles before current,
-    // exactly matching the Dashboard's Previous Debt card total.
+    // 1. Live Previous Debt view: all unpaid arrears from cycles before the target cycle,
+    // exactly matching the Dashboard's Previous Debt card total for that cycle.
     if (req.query.view === 'previousDebt' || req.query.month === 'previous') {
-        const livePreviousPayers = await getPreviousDebtPayers(currentCycle());
+        const targetCycle = isValidCycleKey(req.query.cycle || '')
+            ? req.query.cycle
+            : (isValidCycleKey(req.query.month || '') && req.query.month !== 'previous' ? req.query.month : currentCycle());
+        const livePreviousPayers = await getPreviousDebtPayers(targetCycle);
         return res.json(livePreviousPayers);
     }
 
