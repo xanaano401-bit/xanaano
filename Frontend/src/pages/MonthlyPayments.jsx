@@ -871,95 +871,26 @@ const MonthlyPayments = () => {
                 </tr>
               )}
 
-              {/* Screen & Print Table Footer Row */}
-              {filtered.length > 0 && (
-                <tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-50/75 dark:bg-slate-800/50 font-black">
-                  <td colSpan={4} className="px-5 py-3.5 text-right uppercase text-xs tracking-wider text-slate-500 dark:text-slate-400 print:text-black print:px-1.5 print:py-0.5 print:text-[8pt]">
-                    {statusFilter === 'paid'
-                      ? `${t('monthlyPayments.footerCollected')}:`
-                      : statusFilter === 'pending' || isPreviousDebtView
-                        ? `${t('monthlyPayments.pending')}:`
-                        : `${t('common.total')}:`}
-                  </td>
-                  <td className="px-5 py-3.5 text-right text-xs font-black text-slate-900 dark:text-white tabular-nums print:text-black print:px-1.5 print:py-0.5 print:text-[8pt]">
-                    {statusFilter === 'paid' ? `$${fmtMoney(filteredCollected)}` : statusFilter === 'pending' || isPreviousDebtView ? '—' : `$${fmtMoney(filteredExpected)}`}
-                  </td>
-                  <td className="px-5 py-3.5 text-right text-xs font-black text-emerald-600 dark:text-emerald-400 tabular-nums print:text-black print:px-1.5 print:py-0.5 print:text-[8pt]">
-                    {statusFilter === 'pending' || isPreviousDebtView ? '—' : `$${fmtMoney(filteredCollected)}`}
-                  </td>
-                  <td className="px-5 py-3.5 text-right text-xs font-black text-rose-600 dark:text-rose-400 tabular-nums print:text-black print:px-1.5 print:py-0.5 print:text-[8pt]">
-                    {statusFilter === 'paid' ? '$0.00' : `$${fmtMoney(filteredPending)}`}
-                  </td>
-                  <td className="px-5 py-3.5 text-center print:hidden"></td>
-                </tr>
-              )}
+              {/* Compact Print Summary Row (Only on paper) */}
+              <tr className="hidden print:table-row font-black print-summary-row border-t-2 border-black">
+                <td colSpan={5} className="px-2 py-1 text-right uppercase text-[8pt] text-black font-extrabold">
+                  {statusFilter === 'paid'
+                    ? `${t('monthlyPayments.footerCollected')}:`
+                    : `${t('monthlyPayments.print.unpaidTotal')}:`}
+                </td>
+                <td className="px-1.5 py-1 text-right text-[8.5pt] text-black font-black">
+                  ${fmtMoney(statusFilter === 'paid' ? filteredCollected : filteredPending)}
+                </td>
+                <td className="px-1.5 py-1"></td>
+              </tr>
             </tbody>
           </table>
         </div>
-      </div>
 
-      {/* Month total footer (Web only, hidden in print) */}
-      <div className="bg-white dark:bg-slate-900 rounded-[40px] border border-slate-100 dark:border-slate-800 shadow-sm px-8 py-6 flex flex-wrap items-center justify-between gap-4 print:hidden">
-        <div className="flex items-center gap-4">
-          <div className="w-12 h-12 rounded-2xl bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center text-emerald-600 dark:text-emerald-400 print:hidden">
-            <Wallet size={22} strokeWidth={2.5} />
-          </div>
-          <div>
-            <p className="text-[10px] font-black uppercase tracking-[0.2em] text-slate-400">
-              {t('monthlyPayments.footerCycle', { month: MONTH_NAMES[month], year })} · {cycleLabel(monthKey)}
-            </p>
-            <p className="text-sm font-bold text-slate-500 dark:text-slate-400">
-              {t('monthlyPayments.filteredCount', { count: filtered.length })}
-            </p>
-          </div>
-        </div>
-        <div className="flex flex-wrap items-center gap-6">
-          {statusFilter === 'paid' ? (
-            <div className="text-right">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                {t('monthlyPayments.footerCollected')}
-              </p>
-              <p className="text-3xl font-black text-emerald-600 dark:text-emerald-400 leading-none tabular-nums">
-                ${fmtMoney(filteredCollected)}
-              </p>
-            </div>
-          ) : statusFilter === 'pending' || isPreviousDebtView ? (
-            <div className="text-right">
-              <p className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
-                {t('monthlyPayments.pending')}
-              </p>
-              <p className="text-3xl font-black text-rose-600 dark:text-rose-400 leading-none tabular-nums">
-                ${fmtMoney(filteredPending)}
-              </p>
-            </div>
-          ) : (
-            <>
-              <div className="text-right">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
-                  {t('monthlyPayments.totalDue')}
-                </p>
-                <p className="text-2xl font-black text-slate-900 dark:text-white leading-none tabular-nums">
-                  ${fmtMoney(filteredExpected)}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">
-                  {t('monthlyPayments.footerCollected')}
-                </p>
-                <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 leading-none tabular-nums">
-                  ${fmtMoney(filteredCollected)}
-                </p>
-              </div>
-              <div className="text-right">
-                <p className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">
-                  {t('monthlyPayments.pending')}
-                </p>
-                <p className="text-2xl font-black text-rose-600 dark:text-rose-400 leading-none tabular-nums">
-                  ${fmtMoney(filteredPending)}
-                </p>
-              </div>
-            </>
-          )}
+        {/* Clean simple table footer count (No confusing extra totals) */}
+        <div className="flex items-center justify-between px-8 py-4 border-t border-slate-100 dark:border-slate-800 text-xs font-bold text-slate-400 print:hidden">
+          <span>{t('monthlyPayments.filteredCount', { count: filtered.length })}</span>
+          <span>{cycleLabel(monthKey)}</span>
         </div>
       </div>
     </div>
