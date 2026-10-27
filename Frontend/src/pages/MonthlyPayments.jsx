@@ -859,16 +859,24 @@ const MonthlyPayments = () => {
                 </tr>
               )}
 
-              {/* Compact Print Summary Row (Only on paper) - Only Unpaid Total */}
-              <tr className="hidden print:table-row font-black print-summary-row border-t-2 border-black">
-                <td colSpan={5} className="px-2 py-1 text-right uppercase text-[8pt] text-black font-extrabold">
-                  {t('monthlyPayments.print.unpaidTotal')}:
-                </td>
-                <td className="px-1.5 py-1 text-right text-[8.5pt] text-black font-black">
-                  ${fmtMoney(filtered.reduce((sum, p) => sum + Number(p.remaining !== undefined ? p.remaining : Math.max(0, p.totalFee - (p.paidAmount || 0))), 0))}
-                </td>
-                <td className="px-1.5 py-1"></td>
-              </tr>
+              {/* Screen & Print Table Footer Row */}
+              {filtered.length > 0 && (
+                <tr className="border-t-2 border-slate-200 dark:border-slate-700 bg-slate-50/75 dark:bg-slate-800/50 font-black">
+                  <td colSpan={4} className="px-5 py-3.5 text-right uppercase text-xs tracking-wider text-slate-500 dark:text-slate-400 print:text-black print:px-1.5 print:py-0.5 print:text-[8pt]">
+                    {t('common.total')}:
+                  </td>
+                  <td className="px-5 py-3.5 text-right text-xs font-black text-slate-900 dark:text-white tabular-nums print:text-black print:px-1.5 print:py-0.5 print:text-[8pt]">
+                    ${fmtMoney(filtered.reduce((sum, p) => sum + Number(p.totalFee || 0), 0))}
+                  </td>
+                  <td className="px-5 py-3.5 text-right text-xs font-black text-emerald-600 dark:text-emerald-400 tabular-nums print:text-black print:px-1.5 print:py-0.5 print:text-[8pt]">
+                    ${fmtMoney(filtered.reduce((sum, p) => sum + Number(p.paidAmount || 0), 0))}
+                  </td>
+                  <td className="px-5 py-3.5 text-right text-xs font-black text-rose-600 dark:text-rose-400 tabular-nums print:text-black print:px-1.5 print:py-0.5 print:text-[8pt]">
+                    ${fmtMoney(filtered.reduce((sum, p) => sum + Number(p.remaining !== undefined ? p.remaining : Math.max(0, p.totalFee - (p.paidAmount || 0))), 0))}
+                  </td>
+                  <td className="px-5 py-3.5 text-center print:hidden"></td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -889,17 +897,23 @@ const MonthlyPayments = () => {
             </p>
           </div>
         </div>
-        <div className="flex items-center gap-6">
+        <div className="flex flex-wrap items-center gap-6">
           <div className="text-right">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('monthlyPayments.footerCollected')}</p>
-            <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 leading-none">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('monthlyPayments.colFee') || t('common.total')}</p>
+            <p className="text-2xl font-black text-slate-900 dark:text-white leading-none tabular-nums">
+              ${fmtMoney(filtered.reduce((sum, p) => sum + Number(p.totalFee || 0), 0))}
+            </p>
+          </div>
+          <div className="text-right">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-emerald-600 dark:text-emerald-400">{t('monthlyPayments.footerCollected')}</p>
+            <p className="text-2xl font-black text-emerald-600 dark:text-emerald-400 leading-none tabular-nums">
               ${fmtMoney(filtered.reduce((sum, p) => sum + Number(p.paidAmount || 0), 0))}
             </p>
           </div>
           <div className="text-right">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400">{t('common.total')}</p>
-            <p className="text-2xl font-black text-slate-900 dark:text-white leading-none">
-              ${fmtMoney(filtered.reduce((sum, p) => sum + Number(p.totalFee || 0), 0))}
+            <p className="text-[10px] font-bold uppercase tracking-wider text-rose-600 dark:text-rose-400">{t('monthlyPayments.pending')}</p>
+            <p className="text-2xl font-black text-rose-600 dark:text-rose-400 leading-none tabular-nums">
+              ${fmtMoney(filtered.reduce((sum, p) => sum + Number(p.remaining !== undefined ? p.remaining : Math.max(0, p.totalFee - (p.paidAmount || 0))), 0))}
             </p>
           </div>
         </div>
