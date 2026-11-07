@@ -19,7 +19,7 @@ const getStudents = asyncHandler(async (req, res) => {
         filter.branchId = branchId;
     }
 
-    const data = await Student.find(filter)
+    const data = await Student.find(filter).sort({ createdAt: -1 })
         .populate('guardianId')
         .populate('branchId', 'name address phone')
         .populate({ path: 'classId', populate: { path: 'branchId', select: 'name' } })

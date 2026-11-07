@@ -2,7 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { 
   Plus, X, Edit2, Trash2, Users, Search, CheckCircle2, UserPlus, Loader2, 
   DollarSign, IdCard as IdCardIcon, Download, Upload, FileSpreadsheet, AlertCircle,
-  LayoutGrid, List, Filter, GraduationCap, Phone, Calendar, BookOpen, Sparkles, User as UserIcon, LogOut,
+  LayoutGrid, List, Filter, GraduationCap, Phone, Calendar, Clock, BookOpen, Sparkles, User as UserIcon, LogOut,
   HeartPulse, FileText, UploadCloud, Eye, Paperclip, Building2
 } from 'lucide-react';
 import api from '../services/api';
@@ -27,7 +27,9 @@ const SHEET_COLUMNS = [
   { header: 'Relationship', key: 'relationship', width: 16 },
   { header: 'Lacagta Bisha', key: 'monthlyFee', width: 15 },
   { header: 'Adeegga Ardayga', key: 'serviceFee', width: 18 },
-  { header: 'Xanuunada Uu Qabo', key: 'healthConditions', width: 26 }
+  { header: 'Xanuunada Uu Qabo', key: 'healthConditions', width: 26 },
+  { header: 'Taariikhda Diiwaangelinta', key: 'registrationDate', width: 22 },
+  { header: 'Waqtiga Nidaamka Galay', key: 'systemCreatedDate', width: 24 }
 ];
 
 const SHEET_NAME = 'Students';
@@ -354,6 +356,27 @@ const StudentsManagement = () => {
     return `${d}/${m}/${y}`;
   };
 
+  const fmtSystemDate = (value) => {
+    if (!value) return null;
+    try {
+      const d = new Date(value);
+      if (isNaN(d.getTime())) return null;
+      const dateStr = d.toLocaleDateString('en-GB', {
+        day: '2-digit',
+        month: '2-digit',
+        year: 'numeric'
+      });
+      const timeStr = d.toLocaleTimeString([], {
+        hour: '2-digit',
+        minute: '2-digit',
+        hour12: true
+      });
+      return `${dateStr} ${timeStr}`;
+    } catch (_) {
+      return null;
+    }
+  };
+
   const [viewingStudent, setViewingStudent] = useState(null);
   const docInputRef = useRef(null);
 
@@ -528,7 +551,9 @@ const StudentsManagement = () => {
         relationship: guardian?.relationship ? valueLabel('relationship', guardian.relationship, language) : (guardian?.relationship || 'Father'),
         monthlyFee: Number(item.monthlyFee ?? item.fee ?? 0),
         serviceFee: Number(item.serviceFee || 0),
-        healthConditions: item.healthConditions || ''
+        healthConditions: item.healthConditions || '',
+        registrationDate: item.registrationDate ? fmtRegDate(item.registrationDate) : '',
+        systemCreatedDate: item.createdAt ? fmtSystemDate(item.createdAt) : ''
       });
     });
 
@@ -1330,10 +1355,18 @@ const StudentsManagement = () => {
 
                 {/* Footer Actions */}
                 <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between gap-2">
-                  <span className="text-[11px] text-slate-400 font-medium flex items-center gap-1">
-                    <Calendar size={12} />
-                    {item.registrationDate ? fmtRegDate(item.registrationDate) : t('common.notAvailable')}
-                  </span>
+                  <div className="flex flex-col text-[11px] font-medium leading-tight">
+                    <span className="flex items-center gap-1 text-slate-700 dark:text-slate-200 font-semibold" title={t('students.colRegDate')}>
+                      <Calendar size={12} className="text-brand-500" />
+                      {item.registrationDate ? fmtRegDate(item.registrationDate) : t('common.notAvailable')}
+                    </span>
+                    {item.createdAt && (
+                      <span className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-1 mt-0.5" title={t('students.colSystemDate')}>
+                        <Clock size={10} className="text-slate-400" />
+                        {fmtSystemDate(item.createdAt)}
+                      </span>
+                    )}
+                  </div>
                   <div className="flex items-center gap-1.5">
                     <button 
                       onClick={() => setViewingStudent(item)} 
@@ -1388,7 +1421,12 @@ const StudentsManagement = () => {
                   <th className="px-3 py-4 whitespace-nowrap">{t('students.colBranch')}</th>
                   <th className="px-3 py-4 whitespace-nowrap">{t('students.colFee')}</th>
                   <th className="px-4 py-4 whitespace-nowrap">{t('students.colWhoPays')}</th>
-                  <th className="px-3 py-4 whitespace-nowrap">{t('students.colRegDate')}</th>
+                  <th className="px-3 py-4 whitespace-nowrap">
+                    <div className="flex flex-col">
+                      <span>{t('students.colRegDate')}</span>
+                      <span className="text-[9px] font-normal normal-case text-slate-400 dark:text-slate-500">{t('students.colSystemDate') || 'System Timestamp'}</span>
+                    </div>
+                  </th>
                   <th className="px-4 py-4 text-right whitespace-nowrap">{t('common.actions')}</th>
                 </tr>
               </thead>
@@ -1476,7 +1514,18 @@ const StudentsManagement = () => {
                         )}
                       </td>
                       <td className="px-3 py-3.5 text-xs font-medium text-slate-600 dark:text-slate-300 whitespace-nowrap">
-                        {item.registrationDate ? fmtRegDate(item.registrationDate) : <span className="text-slate-400 opacity-60">{t('common.notAvailable')}</span>}
+                        <div className="flex flex-col">
+                          <span className="font-semibold text-slate-800 dark:text-slate-100 flex items-center gap-1">
+                            <Calendar size={12} className="text-brand-500" />
+                            {item.registrationDate ? fmtRegDate(item.registrationDate) : <span className="text-slate-400 opacity-60">{t('common.notAvailable')}</span>}
+                          </span>
+                          {item.createdAt && (
+                            <span className="text-[10px] text-slate-400 dark:text-slate-500 flex items-center gap-1 mt-0.5" title={t('students.colSystemDate') || 'System Created Date'}>
+                              <Clock size={10} className="text-slate-400" />
+                              {fmtSystemDate(item.createdAt)}
+                            </span>
+                          )}
+                        </div>
                       </td>
                       <td className="px-4 py-3.5 text-right whitespace-nowrap">
                         <div className="flex justify-end items-center gap-1.5">
@@ -1985,6 +2034,13 @@ const StudentsManagement = () => {
                   <span className="text-slate-400 font-bold uppercase text-[10px] block">{t('students.colRegDate')}</span>
                   <span className="font-bold text-slate-800 dark:text-slate-200">
                     {viewingStudent.registrationDate ? fmtRegDate(viewingStudent.registrationDate) : '—'}
+                  </span>
+                </div>
+                <div className="p-3 rounded-2xl bg-slate-50 dark:bg-slate-800/60">
+                  <span className="text-slate-400 font-bold uppercase text-[10px] block">{t('students.colSystemDate') || 'Waqtiga Nidaamka Galay'}</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-200 flex items-center gap-1.5">
+                    <Clock size={13} className="text-brand-500" />
+                    {viewingStudent.createdAt ? fmtSystemDate(viewingStudent.createdAt) : '—'}
                   </span>
                 </div>
               </div>
