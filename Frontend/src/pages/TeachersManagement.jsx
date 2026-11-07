@@ -738,31 +738,34 @@ const TeachersManagement = () => {
     }
   };
 
-  const handleDelete = (teacher) => {
-    showConfirm({
+  const handleDelete = async (teacher) => {
+    const ok = await showConfirm({
+      type: 'warning',
       title: tr('academic.teachers.deleteTitle') || 'Delete Employee?',
       message: (tr('academic.teachers.deleteConfirm') || 'Are you sure you want to delete {name}?').replace('{name}', teacher.fullName || teacher.username),
-      confirmText: tr('academic.teachers.yesDelete') || 'Yes, Delete',
-      confirmVariant: 'danger',
-      onConfirm: async () => {
-        try {
-          await api.delete(`/users/${teacher._id}`);
-          showAlert({
-            type: 'success',
-            title: tr('common.deleted'),
-            message: tr('academic.teachers.deletedMsg') || 'Employee deleted successfully.'
-          });
-          fetchTeachers();
-        } catch (error) {
-          console.error('Failed to delete employee:', error);
-          showAlert({
-            type: 'danger',
-            title: tr('common.error'),
-            message: error.response?.data?.message || tr('academic.teachers.deleteFailed') || 'Failed to delete employee.'
-          });
-        }
-      }
+      confirmText: tr('academic.teachers.yesDelete') || tr('common.yesDelete') || 'Yes, Delete',
+      cancelText: tr('common.cancel') || 'Cancel',
+      danger: true
     });
+    if (!ok) return;
+
+    try {
+      await api.delete(`/users/${teacher._id}`);
+      setTeachers(prev => prev.filter(t => t._id !== teacher._id));
+      showAlert({
+        type: 'success',
+        title: tr('common.deleted') || 'Deleted',
+        message: tr('academic.teachers.deletedMsg') || 'Employee deleted successfully.'
+      });
+      fetchTeachers();
+    } catch (error) {
+      console.error('Failed to delete employee:', error);
+      showAlert({
+        type: 'error',
+        title: tr('common.error') || 'Error',
+        message: error.response?.data?.message || tr('academic.teachers.deleteFailed') || 'Failed to delete employee.'
+      });
+    }
   };
 
   return (
